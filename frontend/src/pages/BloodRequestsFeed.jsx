@@ -370,11 +370,11 @@ const BloodRequestsFeed = () => {
         {canCreate && (
           <Button
             onClick={() => {
-              if (user?.role === 'hospital' && !user?.isVerified) return;
+              if (user?.role === 'hospital' && !user?.isHospitalVerified) return;
               setModalOpen(true);
             }}
-            disabled={user?.role === 'hospital' && !user?.isVerified}
-            title={user?.role === 'hospital' && !user?.isVerified ? "Available after admin verification" : ""}
+            disabled={user?.role === 'hospital' && !user?.isHospitalVerified}
+            title={user?.role === 'hospital' && !user?.isHospitalVerified ? "Available after admin verification" : ""}
             className="self-start sm:self-center flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white shadow-lg shadow-rose-500/25 border-none disabled:opacity-50"
           >
             <Plus className="w-5 h-5" />
@@ -653,17 +653,17 @@ const BloodRequestsFeed = () => {
                             <Button
                               variant="secondary"
                               onClick={() => {
-                                if (user?.role === 'hospital' && !user?.isVerified) return;
+                                if (user?.role === 'hospital' && !user?.isHospitalVerified) return;
                                 handleHospitalRespond(request._id);
                               }}
-                              disabled={user?.role === 'hospital' && !user?.isVerified}
-                              title={user?.role === 'hospital' && !user?.isVerified ? "Available after admin verification" : ""}
+                              disabled={user?.role === 'hospital' && !user?.isHospitalVerified}
+                              title={user?.role === 'hospital' && !user?.isHospitalVerified ? "Available after admin verification" : ""}
                               loading={actionLoadingId === request._id}
                               className="text-xs font-bold py-2 px-4 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 disabled:opacity-50"
                             >
                               Respond to Request
                             </Button>
-                            {user?.role === 'hospital' && !user?.isVerified ? (
+                            {user?.role === 'hospital' && !user?.isHospitalVerified ? (
                               <span className="inline-flex items-center gap-1 text-slate-400 cursor-not-allowed font-semibold text-xs" title="Available after admin verification">
                                 <Search className="w-4 h-4" /> Search Directory
                               </span>

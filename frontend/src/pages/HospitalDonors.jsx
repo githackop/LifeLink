@@ -15,7 +15,7 @@ import { getErrorMessage } from '../services/api';
 
 const HospitalDonors = () => {
   const { user } = useAuth();
-  const isUnverified = user?.role === 'hospital' && !user?.isVerified;
+  const isUnverified = user?.role === 'hospital' && !user?.isHospitalVerified;
   const [donors, setDonors] = useState([]);
   const [loading, setLoading] = useState(true);
 

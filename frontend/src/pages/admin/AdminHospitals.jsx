@@ -44,7 +44,7 @@ const AdminHospitals = () => {
   const handleVerify = async (hospital) => {
     setActionId(`${hospital._id}-verify`);
     try {
-      const { data } = await toggleHospitalVerify(hospital._id, !hospital.isVerified);
+      const { data } = await toggleHospitalVerify(hospital._id, !hospital.isHospitalVerified);
       showSuccess(data.message);
       fetchHospitals();
     } catch (err) {
@@ -129,12 +129,12 @@ const AdminHospitals = () => {
                       <td className="px-6 py-3">
                         <span
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            h.isVerified
+                            h.isHospitalVerified
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {h.isVerified ? (
+                          {h.isHospitalVerified ? (
                             <>
                               <ShieldCheck className="w-3.5 h-3.5" />
                               Verified
@@ -174,7 +174,7 @@ const AdminHospitals = () => {
                             onClick={() => handleVerify(h)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                           >
-                            {h.isVerified ? (
+                            {h.isHospitalVerified ? (
                               <>
                                 <ShieldX className="w-3.5 h-3.5" />
                                 Unverify

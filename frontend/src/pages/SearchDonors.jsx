@@ -23,7 +23,7 @@ const defaultFilters = {
 const SearchDonors = () => {
   const { user } = useAuth();
   const isHospital = user?.role === 'hospital';
-  const isHospitalUnverified = user?.role === 'hospital' && !user?.isVerified;
+  const isHospitalUnverified = user?.role === 'hospital' && !user?.isHospitalVerified;
   const [filters, setFilters] = useState(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
   const [donors, setDonors] = useState([]);

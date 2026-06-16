@@ -15,6 +15,7 @@ import Register from '../pages/Register';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import ProfilePage from '../pages/ProfilePage';
+import VerifyAccount from '../pages/VerifyAccount';
 
 import DonorAvailabilityPage from '../pages/DonorAvailabilityPage';
 import SearchDonors from '../pages/SearchDonors';
@@ -178,6 +179,15 @@ const AppRoutes = () => (
             element={
               <GuestRoute>
                 <Register />
+              </GuestRoute>
+            }
+          />
+
+          <Route
+            path="/verify-account"
+            element={
+              <GuestRoute>
+                <VerifyAccount />
               </GuestRoute>
             }
           />

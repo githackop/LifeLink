@@ -193,7 +193,7 @@ const DashboardLayout = () => {
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          {user?.role === 'hospital' && !user?.isVerified && (
+          {user?.role === 'hospital' && !user?.isHospitalVerified && (
             <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3 shadow-sm animate-pulse">
               <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>

@@ -11,7 +11,7 @@ import Button from '../components/ui/Button';
 
 const EmergencyRequests = () => {
   const { user } = useAuth();
-  const isUnverified = user?.role === 'hospital' && !user?.isVerified;
+  const isUnverified = user?.role === 'hospital' && !user?.isHospitalVerified;
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

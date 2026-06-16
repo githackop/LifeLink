@@ -74,8 +74,24 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isDeactivated: {
+      type: Boolean,
+      default: false,
+    },
+    isHospitalVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationOTP: String,
+    emailVerificationOTPExpires: Date,
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    passwordChangeOtp: String,
+    passwordChangeOtpExpire: Date,
+    passwordChangeOtpVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

@@ -60,7 +60,7 @@ const HospitalDashboard = () => {
   const profile = data?.user || user;
   const donors = data?.donors || [];
   const emergencyList = data?.emergencyRequests || [];
-  const isUnverified = user?.role === 'hospital' && !user?.isVerified;
+  const isUnverified = user?.role === 'hospital' && !user?.isHospitalVerified;
 
   return (
     <div className="space-y-8">
