@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { getEmergencyRequests } from '../services/requestService';
 import { getErrorMessage } from '../services/api';
 import RequestCard from '../components/requests/RequestCard';
@@ -9,6 +10,8 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
 
 const EmergencyRequests = () => {
+  const { user } = useAuth();
+  const isUnverified = user?.role === 'hospital' && !user?.isVerified;
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -54,12 +57,21 @@ const EmergencyRequests = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <Link
-            to="/search-donors"
-            className="text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2 rounded-xl shadow-md"
-          >
-            New emergency request
-          </Link>
+          {isUnverified ? (
+            <span
+              className="text-sm font-medium text-slate-400 bg-slate-100 px-4 py-2 rounded-xl cursor-not-allowed border border-slate-200"
+              title="Available after admin verification"
+            >
+              New emergency request
+            </span>
+          ) : (
+            <Link
+              to="/search-donors"
+              className="text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2 rounded-xl shadow-md"
+            >
+              New emergency request
+            </Link>
+          )}
         </div>
       </motion.div>
 

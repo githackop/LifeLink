@@ -233,8 +233,13 @@ const BloodRequestsFeed = () => {
 
         {canCreate && (
           <Button
-            onClick={() => setModalOpen(true)}
-            className="self-start sm:self-center flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white shadow-lg shadow-rose-500/25 border-none"
+            onClick={() => {
+              if (user?.role === 'hospital' && !user?.isVerified) return;
+              setModalOpen(true);
+            }}
+            disabled={user?.role === 'hospital' && !user?.isVerified}
+            title={user?.role === 'hospital' && !user?.isVerified ? "Available after admin verification" : ""}
+            className="self-start sm:self-center flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white shadow-lg shadow-rose-500/25 border-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-5 h-5" />
             Broadcast Request
@@ -478,19 +483,34 @@ const BloodRequestsFeed = () => {
                     <div className="flex items-center gap-3">
                       <Button
                         variant="secondary"
-                        onClick={() => handleHospitalRespond(request._id)}
+                        onClick={() => {
+                          if (user?.role === 'hospital' && !user?.isVerified) return;
+                          handleHospitalRespond(request._id);
+                        }}
+                        disabled={user?.role === 'hospital' && !user?.isVerified}
+                        title={user?.role === 'hospital' && !user?.isVerified ? "Available after admin verification" : ""}
                         loading={actionLoadingId === request._id}
-                        className="text-xs font-semibold py-1.5 px-3 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200"
+                        className="text-xs font-semibold py-1.5 px-3 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Respond to Request
                       </Button>
-                      <Link
-                        to={`/hospital-donors`}
-                        className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-500 font-semibold transition-colors"
-                      >
-                        <Search className="w-4 h-4" />
-                        Search Directory
-                      </Link>
+                      {user?.role === 'hospital' && !user?.isVerified ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-slate-400 cursor-not-allowed font-semibold"
+                          title="Available after admin verification"
+                        >
+                          <Search className="w-4 h-4" />
+                          Search Directory
+                        </span>
+                      ) : (
+                        <Link
+                          to={`/hospital-donors`}
+                          className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-500 font-semibold transition-colors"
+                        >
+                          <Search className="w-4 h-4" />
+                          Search Directory
+                        </Link>
+                      )}
                     </div>
                   </div>
                 )}

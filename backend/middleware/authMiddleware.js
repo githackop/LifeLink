@@ -34,3 +34,15 @@ export const protect = asyncHandler(async (req, res, next) => {
     throw new AppError('Not authorized. Invalid or expired token.', 401);
   }
 });
+
+export const isVerifiedHospital = (req, res, next) => {
+  if (
+    req.user &&
+    req.user.role === 'hospital' &&
+    !req.user.isVerified &&
+    ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)
+  ) {
+    return next(new AppError('Hospital account is pending admin verification', 403));
+  }
+  next();
+};

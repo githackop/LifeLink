@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Phone, Mail, Calendar, Users, Plus, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { showError, showSuccess } from '../utils/toast';
 import EmptyState from '../components/ui/EmptyState';
 import { SkeletonCardList } from '../components/ui/Skeleton';
@@ -13,6 +14,8 @@ import {
 import { getErrorMessage } from '../services/api';
 
 const HospitalDonors = () => {
+  const { user } = useAuth();
+  const isUnverified = user?.role === 'hospital' && !user?.isVerified;
   const [donors, setDonors] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -104,8 +107,13 @@ const HospitalDonors = () => {
         </div>
 
         <button
-          onClick={() => setShowForm((prev) => !prev)}
-          className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-lg"
+          onClick={() => {
+            if (isUnverified) return;
+            setShowForm((prev) => !prev);
+          }}
+          disabled={isUnverified}
+          title={isUnverified ? "Available after admin verification" : ""}
+          className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {showForm ? 'Close' : 'Add Donor'}

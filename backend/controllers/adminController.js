@@ -3,7 +3,8 @@ import User, { BLOOD_GROUPS, ROLES } from '../models/User.js';
 import BloodRequest from '../models/BloodRequest.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
-import { emitAdminUpdate, emitAccountUpdate } from '../sockets/socketManager.js';
+import { emitAdminUpdate, emitAccountUpdate, emitToUser } from '../sockets/socketManager.js';
+import Notification from '../models/Notification.js';
 
 const requesterFields = 'name email role hospitalName';
 const donorFields = 'name bloodGroup';
@@ -319,6 +320,37 @@ export const toggleHospitalVerify = asyncHandler(async (req, res) => {
   await hospital.save();
 
   notifyAdminChange(hospital.isVerified ? 'hospital_verified' : 'hospital_unverified', hospital);
+
+  if (hospital.isVerified) {
+    const title = 'Hospital Verified';
+    const message = 'Your hospital account has been approved. You now have full access to hospital features.';
+    
+    const notification = await Notification.create({
+      recipientId: hospital._id,
+      type: 'request_response',
+      title,
+      message,
+      metadata: {
+        hospitalId: hospital._id.toString(),
+      },
+    });
+
+    const body = {
+      _id: notification._id.toString(),
+      type: 'request_response',
+      read: false,
+      title,
+      message,
+      createdAt: notification.createdAt.toISOString(),
+      metadata: {
+        hospitalId: hospital._id.toString(),
+      },
+      status: 'hospital_verified',
+      donorName: hospital.hospitalName || hospital.name,
+    };
+
+    emitToUser(hospital._id, 'request_response', body);
+  }
 
   res.status(200).json({
     success: true,
