@@ -119,18 +119,30 @@ export const register = asyncHandler(async (req, res) => {
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    throw new AppError('Please enter your email and password.', 400);
+  }
+
   const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
-  if (!user || !(await user.matchPassword(password))) {
-    throw new AppError('Invalid email or password', 401);
+  if (!user) {
+    throw new AppError('No account found with this email.', 404);
+  }
+
+  if (!(await user.matchPassword(password))) {
+    throw new AppError('Incorrect password. Please try again.', 401);
   }
 
   if (user.isBlocked) {
-    throw new AppError('Your account has been blocked by the administrator.', 403);
+    throw new AppError('Your account has been temporarily blocked. Contact support.', 403);
   }
 
   if (!user.isVerified) {
     throw new AppError('Please verify your email before logging in.', 403);
+  }
+
+  if (user.role === 'hospital' && !user.isHospitalVerified) {
+    throw new AppError('Your hospital account is awaiting admin approval.', 403);
   }
 
   if (user.isDeactivated) {

@@ -20,6 +20,7 @@ import { getErrorMessage } from '../../services/api';
 import { showError, showSuccess } from '../../utils/toast';
 import { BLOOD_GROUPS } from '../../utils/bloodGroups';
 import Button from '../../components/ui/Button';
+import Select from '../../components/ui/Select';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import BroadcastDetailsModal from '../../components/requests/BroadcastDetailsModal';
 import ConfirmModal from '../../components/common/ConfirmModal';
@@ -119,7 +120,7 @@ const AdminBroadcasts = () => {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-5 shadow-soft space-y-4"
+        className="relative z-20 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-5 shadow-soft space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -139,18 +140,19 @@ const AdminBroadcasts = () => {
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Blood group</label>
             <div className="relative">
               <Droplets className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <select
-                value={filters.bloodGroup}
-                onChange={(e) => setFilters((f) => ({ ...f, bloodGroup: e.target.value }))}
-                className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              >
-                <option value="">All groups</option>
-                {BLOOD_GROUPS.map((bg) => (
-                  <option key={bg} value={bg}>
-                    {bg}
-                  </option>
-                ))}
-              </select>
+            <Select
+              icon={Droplets}
+              value={filters.bloodGroup}
+              onChange={(e) => setFilters((f) => ({ ...f, bloodGroup: e.target.value }))}
+              className="!py-2 text-xs"
+            >
+              <option value="">All groups</option>
+              {BLOOD_GROUPS.map((bg) => (
+                <option key={bg} value={bg}>
+                  {bg}
+                </option>
+              ))}
+            </Select>
             </div>
           </div>
 
@@ -174,18 +176,19 @@ const AdminBroadcasts = () => {
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Emergency level</label>
             <div className="relative">
               <AlertTriangle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <select
-                value={filters.emergencyLevel}
-                onChange={(e) => setFilters((f) => ({ ...f, emergencyLevel: e.target.value }))}
-                className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              >
-                <option value="">All levels</option>
-                {EMERGENCY_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {level.toUpperCase()}
-                  </option>
-                ))}
-              </select>
+            <Select
+              icon={AlertTriangle}
+              value={filters.emergencyLevel}
+              onChange={(e) => setFilters((f) => ({ ...f, emergencyLevel: e.target.value }))}
+              className="!py-2 text-xs"
+            >
+              <option value="">All levels</option>
+              {EMERGENCY_LEVELS.map((level) => (
+                <option key={level} value={level}>
+                  {level.toUpperCase()}
+                </option>
+              ))}
+            </Select>
             </div>
           </div>
 
@@ -194,15 +197,16 @@ const AdminBroadcasts = () => {
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Status</label>
             <div className="relative">
               <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-                className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              >
-                <option value="">All status</option>
-                <option value="active">Active</option>
-                <option value="closed">Resolved / Closed</option>
-              </select>
+            <Select
+              icon={Clock}
+              value={filters.status}
+              onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+              className="!py-2 text-xs"
+            >
+              <option value="">All status</option>
+              <option value="active">Active</option>
+              <option value="closed">Resolved / Closed</option>
+            </Select>
             </div>
           </div>
         </div>

@@ -32,6 +32,7 @@ import { roleLabels } from '../utils/roleConfig';
 import * as profileService from '../services/profileService';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Button from '../components/ui/Button';
+import Select from '../components/ui/Select';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -625,15 +626,14 @@ const ProfilePage = () => {
                     <>
                       <div>
                         <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Blood Group</label>
-                        <select
+                        <Select
                           value={bloodGroup}
                           onChange={(e) => setBloodGroup(e.target.value)}
-                          className="w-full py-2.5 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
                         >
                           {BLOOD_GROUPS.map((bg) => (
                             <option key={bg} value={bg}>{bg}</option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
 
                       {/* Availability Switch */}

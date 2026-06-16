@@ -38,6 +38,7 @@ import { deleteAdminBroadcast } from '../services/adminService';
 import { getErrorMessage } from '../services/api';
 import { showError, showSuccess } from '../utils/toast';
 import Button from '../components/ui/Button';
+import Select from '../components/ui/Select';
 import EmptyState from '../components/ui/EmptyState';
 import { SkeletonCardList } from '../components/ui/Skeleton';
 import { BLOOD_GROUPS } from '../utils/bloodGroups';
@@ -384,7 +385,7 @@ const BloodRequestsFeed = () => {
       </div>
 
       {/* FILTER PANEL */}
-      <div className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-5 shadow-soft space-y-4">
+      <div className="relative z-20 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-5 shadow-soft space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
             <Filter className="w-4 h-4 text-brand-600" />
@@ -403,21 +404,18 @@ const BloodRequestsFeed = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Blood Group</label>
-            <div className="relative">
-              <Droplets className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <select
-                value={filters.bloodGroup}
-                onChange={(e) => setFilters((f) => ({ ...f, bloodGroup: e.target.value }))}
-                className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white/80 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
-              >
-                <option value="">All groups</option>
-                {BLOOD_GROUPS.map((bg) => (
-                  <option key={bg} value={bg}>
-                    {bg}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              icon={Droplets}
+              value={filters.bloodGroup}
+              onChange={(e) => setFilters((f) => ({ ...f, bloodGroup: e.target.value }))}
+            >
+              <option value="">All groups</option>
+              {BLOOD_GROUPS.map((bg) => (
+                <option key={bg} value={bg}>
+                  {bg}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div>
@@ -436,20 +434,17 @@ const BloodRequestsFeed = () => {
 
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Emergency Level</label>
-            <div className="relative">
-              <AlertTriangle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <select
-                value={filters.emergencyLevel}
-                onChange={(e) => setFilters((f) => ({ ...f, emergencyLevel: e.target.value }))}
-                className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white/80 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
-              >
-                <option value="">All levels</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent / Critical</option>
-              </select>
-            </div>
+            <Select
+              icon={AlertTriangle}
+              value={filters.emergencyLevel}
+              onChange={(e) => setFilters((f) => ({ ...f, emergencyLevel: e.target.value }))}
+            >
+              <option value="">All levels</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent / Critical</option>
+            </Select>
           </div>
         </div>
       </div>
@@ -751,22 +746,19 @@ const BloodRequestsFeed = () => {
                   {/* Blood Group */}
                   <div>
                     <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Blood Group Required</label>
-                    <div className="relative">
-                      <Droplets className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <select
-                        value={newRequest.bloodGroup}
-                        onChange={(e) => setNewRequest((n) => ({ ...n, bloodGroup: e.target.value }))}
-                        required
-                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
-                      >
-                        <option value="">Select</option>
-                        {BLOOD_GROUPS.map((bg) => (
-                          <option key={bg} value={bg}>
-                            {bg}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <Select
+                      icon={Droplets}
+                      value={newRequest.bloodGroup}
+                      onChange={(e) => setNewRequest((n) => ({ ...n, bloodGroup: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select</option>
+                      {BLOOD_GROUPS.map((bg) => (
+                        <option key={bg} value={bg}>
+                          {bg}
+                        </option>
+                      ))}
+                    </Select>
                   </div>
 
                   {/* Units required */}
@@ -840,39 +832,33 @@ const BloodRequestsFeed = () => {
                   {/* Emergency Level */}
                   <div>
                     <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Urgency Level</label>
-                    <div className="relative">
-                      <AlertTriangle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <select
-                        value={newRequest.emergencyLevel}
-                        onChange={(e) => setNewRequest((n) => ({ ...n, emergencyLevel: e.target.value }))}
-                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent / Critical</option>
-                      </select>
-                    </div>
+                    <Select
+                      icon={AlertTriangle}
+                      value={newRequest.emergencyLevel}
+                      onChange={(e) => setNewRequest((n) => ({ ...n, emergencyLevel: e.target.value }))}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent / Critical</option>
+                    </Select>
                   </div>
                 </div>
 
                 {/* Primary Reason */}
                 <div>
                   <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Medical Case / Reason</label>
-                  <div className="relative">
-                    <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <select
-                      value={newRequest.reason}
-                      onChange={(e) => setNewRequest((n) => ({ ...n, reason: e.target.value }))}
-                      className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
-                    >
-                      {REASONS.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <Select
+                    icon={FileText}
+                    value={newRequest.reason}
+                    onChange={(e) => setNewRequest((n) => ({ ...n, reason: e.target.value }))}
+                  >
+                    {REASONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
 
                 {/* Message */}

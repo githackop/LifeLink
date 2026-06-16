@@ -18,6 +18,7 @@ import {
 import Button from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { BLOOD_GROUPS } from '../../utils/bloodGroups';
+import Select from '../ui/Select';
 
 const REASONS = [
   'Surgery',
@@ -156,24 +157,20 @@ const SendRequestModal = ({ donor, open, onClose, onSubmit, loading }) => {
                 </span>
               </div>
 
-              {/* Blood group selection */}
               <div>
                 <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Blood Group Needed</label>
-                <div className="relative">
-                  <Droplets className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <select
-                    value={bloodGroup}
-                    onChange={(e) => setBloodGroup(e.target.value)}
-                    required
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15 text-slate-800"
-                  >
-                    {BLOOD_GROUPS.map((bg) => (
-                      <option key={bg} value={bg}>
-                        {bg}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  icon={Droplets}
+                  value={bloodGroup}
+                  onChange={(e) => setBloodGroup(e.target.value)}
+                  required
+                >
+                  {BLOOD_GROUPS.map((bg) => (
+                    <option key={bg} value={bg}>
+                      {bg}
+                    </option>
+                  ))}
+                </Select>
               </div>
 
               {/* Emergency Switch Toggle */}
@@ -313,23 +310,19 @@ const SendRequestModal = ({ donor, open, onClose, onSubmit, loading }) => {
                       </div>
                     </div>
 
-                    {/* Case Reason */}
                     <div>
                       <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Medical Case / Reason</label>
-                      <div className="relative">
-                        <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select
-                          value={reason}
-                          onChange={(e) => setReason(e.target.value)}
-                          className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15 text-slate-800"
-                        >
-                          {REASONS.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <Select
+                        icon={FileText}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                      >
+                        {REASONS.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </Select>
                     </div>
 
                     {/* Allow Contact checkbox */}

@@ -26,6 +26,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { SkeletonCardList } from '../components/ui/Skeleton';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Button from '../components/ui/Button';
+import Select from '../components/ui/Select';
 
 import {
   getHospitalDonors,
@@ -355,7 +356,7 @@ const HospitalDonors = () => {
         {/* SEARCH, FILTERS & CARDS */}
         <div className="lg:col-span-2 space-y-6">
           {/* SEARCH & FILTER CONTROLS */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+          <div className="relative z-20 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
@@ -398,32 +399,32 @@ const HospitalDonors = () => {
                     <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">
                       Blood Group
                     </label>
-                    <select
+                    <Select
                       value={selectedBloodGroup}
                       onChange={(e) => setSelectedBloodGroup(e.target.value)}
-                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none"
+                      className="!py-1.5 bg-slate-50 text-xs text-slate-800"
                     >
                       <option value="">All Groups</option>
                       {BLOOD_GROUPS.map(bg => (
                         <option key={bg} value={bg}>{bg}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <div className="flex-1 min-w-[150px]">
                     <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">
                       City
                     </label>
-                    <select
+                    <Select
                       value={selectedCity}
                       onChange={(e) => setSelectedCity(e.target.value)}
-                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none"
+                      className="!py-1.5 bg-slate-50 text-xs text-slate-800"
                     >
                       <option value="">All Cities</option>
                       {uniqueCities.map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <button
@@ -484,16 +485,16 @@ const HospitalDonors = () => {
                       </div>
                       <div>
                         <label className="block text-xs text-slate-500 mb-1 font-medium">Blood Group</label>
-                        <select
+                        <Select
                           name="bloodGroup"
                           value={form.bloodGroup}
                           onChange={handleFormChange}
-                          className="w-full text-sm p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 text-slate-800 bg-white"
+                          className="!py-2"
                         >
                           {BLOOD_GROUPS.map(bg => (
                             <option key={bg} value={bg}>{bg}</option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                     </div>
                   </div>

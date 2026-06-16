@@ -19,6 +19,7 @@ import FormInput from '../components/ui/FormInput';
 import Button from '../components/ui/Button';
 import RoleSelector, { BLOOD_GROUPS } from '../components/auth/RoleSelector';
 import { showSuccess } from '../utils/toast';
+import Select from '../components/ui/Select';
 
 const initialForm = {
   name: '',
@@ -318,18 +319,17 @@ const Register = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-slate-700">Blood group</label>
-                        <select
+                        <Select
                           name="bloodGroup"
                           value={form.bloodGroup}
                           onChange={handleChange}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500"
                         >
                           {BLOOD_GROUPS.map((bg) => (
                             <option key={bg} value={bg}>
                               {bg}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                       <FormInput
                         label="City"

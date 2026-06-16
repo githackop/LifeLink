@@ -23,6 +23,7 @@ import { getDonorStats } from '../utils/donorStats';
 import DonorCard from '../components/requests/DonorCard';
 import DonorDetailsModal from '../components/requests/DonorDetailsModal';
 import SendRequestModal from '../components/requests/SendRequestModal';
+import Select from '../components/ui/Select';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import { SkeletonDonorGrid } from '../components/ui/Skeleton';
@@ -236,7 +237,7 @@ const SearchDonors = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
         onSubmit={handleApplyFilters}
-        className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-5 shadow-soft space-y-4"
+        className="relative z-20 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-5 shadow-soft space-y-4"
       >
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
@@ -269,21 +270,18 @@ const SearchDonors = () => {
           {/* Blood group */}
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Blood group</label>
-            <div className="relative">
-              <Droplets className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <select
-                value={filters.bloodGroup}
-                onChange={(e) => setFilters((f) => ({ ...f, bloodGroup: e.target.value }))}
-                className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-4 focus:ring-brand-500/10 text-slate-800"
-              >
-                <option value="">All Groups</option>
-                {BLOOD_GROUPS.map((bg) => (
-                  <option key={bg} value={bg}>
-                    {bg}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              icon={Droplets}
+              value={filters.bloodGroup}
+              onChange={(e) => setFilters((f) => ({ ...f, bloodGroup: e.target.value }))}
+            >
+              <option value="">All Groups</option>
+              {BLOOD_GROUPS.map((bg) => (
+                <option key={bg} value={bg}>
+                  {bg}
+                </option>
+              ))}
+            </Select>
           </div>
 
           {/* City */}
@@ -304,29 +302,27 @@ const SearchDonors = () => {
           {/* Availability */}
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Availability</label>
-            <select
+            <Select
               value={filters.availability}
               onChange={(e) => setFilters((f) => ({ ...f, availability: e.target.value }))}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-4 focus:ring-brand-500/10 text-slate-800"
             >
               <option value="">All Available & Unavailable</option>
               <option value="true">Available Only</option>
               <option value="false">Unavailable Only</option>
-            </select>
+            </Select>
           </div>
 
           {/* Sorting control */}
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Sort Results By</label>
-            <select
+            <Select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-4 focus:ring-brand-500/10 text-slate-800"
             >
               <option value="active">Recently Active</option>
               <option value="donations">Most Donations</option>
               <option value="name">Name (A-Z)</option>
-            </select>
+            </Select>
           </div>
         </div>
 

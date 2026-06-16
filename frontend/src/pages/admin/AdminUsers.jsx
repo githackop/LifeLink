@@ -10,6 +10,7 @@ import {
 import { getErrorMessage } from '../../services/api';
 import { roleLabels } from '../../utils/roleConfig';
 import Button from '../../components/ui/Button';
+import Select from '../../components/ui/Select';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import AdminUserDetailsModal from '../../components/admin/AdminUserDetailsModal';
 import ConfirmModal from '../../components/common/ConfirmModal';
@@ -101,7 +102,7 @@ const AdminUsers = () => {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row gap-3"
+        className="relative z-20 flex flex-col sm:flex-row gap-3"
       >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -113,10 +114,10 @@ const AdminUsers = () => {
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
           />
         </div>
-        <select
+        <Select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          className="!py-2 focus:ring-violet-500/30 focus:border-violet-500"
         >
           <option value="">All roles</option>
           {ROLES.map((r) => (
@@ -124,7 +125,7 @@ const AdminUsers = () => {
               {roleLabels[r]?.label || r}
             </option>
           ))}
-        </select>
+        </Select>
         <Button variant="secondary" onClick={fetchUsers} className="!py-2.5">
           <RefreshCw className="w-4 h-4" />
           Refresh
