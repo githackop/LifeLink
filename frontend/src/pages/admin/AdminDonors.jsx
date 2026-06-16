@@ -187,7 +187,7 @@ const AdminDonors = () => {
                           </button>
                           <button
                             type="button"
-                            disabled={actionId === d._id}
+                            disabled={deleteLoading}
                             onClick={() => handleDeleteClick(d)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
                           >

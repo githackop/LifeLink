@@ -21,7 +21,8 @@ import {
   Hash,
   Eye,
   User,
-  Building2
+  Building2,
+  Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +34,7 @@ import {
   respondToBroadcastRequest,
   closeBroadcastRequest,
 } from '../services/requestService';
+import { deleteAdminBroadcast } from '../services/adminService';
 import { getErrorMessage } from '../services/api';
 import { showError, showSuccess } from '../utils/toast';
 import Button from '../components/ui/Button';
@@ -71,6 +73,11 @@ const BloodRequestsFeed = () => {
   const [broadcastToClose, setBroadcastToClose] = useState(null);
   const [closeLoading, setCloseLoading] = useState(false);
 
+  // Admin delete states
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [broadcastToDelete, setBroadcastToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // Details Modal State
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -100,6 +107,7 @@ const BloodRequestsFeed = () => {
 
   const isDonor = user?.role === 'donor';
   const isHospital = user?.role === 'hospital';
+  const isAdmin = user?.role === 'admin';
   const canCreate = user?.role === 'user' || user?.role === 'hospital';
 
   // Fetch requests from backend
@@ -236,6 +244,32 @@ const BloodRequestsFeed = () => {
       showError(getErrorMessage(err));
     } finally {
       setCloseLoading(false);
+    }
+  };
+
+  const handleOpenDetails = (request) => {
+    setSelectedRequest(request);
+    setDetailsOpen(true);
+  };
+
+  const handleDeleteClick = (request) => {
+    setBroadcastToDelete(request);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!broadcastToDelete) return;
+    setDeleteLoading(true);
+    try {
+      await deleteAdminBroadcast(broadcastToDelete._id);
+      showSuccess('Broadcast request deleted successfully');
+      setDeleteConfirmOpen(false);
+      setBroadcastToDelete(null);
+      setRequests((prev) => prev.filter((r) => r._id !== broadcastToDelete._id));
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -571,6 +605,19 @@ const BloodRequestsFeed = () => {
                       View Details
                     </button>
 
+                    {/* Admin delete button */}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteClick(request)}
+                        disabled={deleteLoading}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-colors border border-red-200/50 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Request
+                      </button>
+                    )}
+
                     {isClosed ? (
                       /* Resolved status notification display */
                       <div className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-bold text-xs">
@@ -892,6 +939,21 @@ const BloodRequestsFeed = () => {
         }}
         loading={closeLoading}
         isDanger={false}
+      />
+
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        title="Delete Broadcast Request"
+        description={`Are you sure you want to delete this broadcast request${broadcastToDelete?.patientName ? ` for ${broadcastToDelete.patientName}` : ''}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setBroadcastToDelete(null);
+        }}
+        loading={deleteLoading}
+        isDanger={true}
       />
     </div>
   );
