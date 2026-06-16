@@ -22,6 +22,10 @@ export const protect = asyncHandler(async (req, res, next) => {
       throw new AppError('User no longer exists.', 401);
     }
 
+    if (req.user.isBlocked) {
+      throw new AppError('Your account has been blocked.', 403);
+    }
+
     next();
   } catch (error) {
     if (error instanceof AppError) {

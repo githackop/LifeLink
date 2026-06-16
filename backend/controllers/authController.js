@@ -67,6 +67,10 @@ export const login = asyncHandler(async (req, res) => {
     throw new AppError('Invalid email or password', 401);
   }
 
+  if (user.isBlocked) {
+    throw new AppError('Your account has been blocked by the administrator.', 403);
+  }
+
   sendTokenResponse(user, 200, res);
 });
 
