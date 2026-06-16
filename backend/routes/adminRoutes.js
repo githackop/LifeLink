@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getStats,
   getUsers,
+  getUserDetails,
   deleteUser,
   toggleUserBlock,
   getDonors,
@@ -20,6 +21,7 @@ router.use(authorize('admin'));
 
 router.get('/stats', getStats);
 router.get('/users', getUsers);
+router.get('/users/:id', getUserDetails);
 router.delete('/users/:id', deleteUser);
 router.patch('/users/:id/block', toggleUserBlock);
 router.get('/donors', getDonors);

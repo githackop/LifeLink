@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import User, { BLOOD_GROUPS, ROLES } from '../models/User.js';
 import BloodRequest from '../models/BloodRequest.js';
+import HospitalDonor from '../models/HospitalDonor.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
 import { emitAdminUpdate, emitAccountUpdate, emitToUser } from '../sockets/socketManager.js';
@@ -393,5 +394,134 @@ export const toggleHospitalBlock = asyncHandler(async (req, res) => {
       ? 'Hospital blocked successfully'
       : 'Hospital unblocked successfully',
     hospital: formatAdminUser(hospital),
+  });
+});
+
+export const getUserDetails = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateObjectId(id);
+
+  const user = await User.findById(id);
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Get aggregated request stats using MongoDB aggregation
+  const sentStats = await BloodRequest.aggregate([
+    { $match: { requesterId: new mongoose.Types.ObjectId(id) } },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+        accepted: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } },
+        rejected: { $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] } },
+        emergency: { $sum: { $cond: [{ $eq: ['$emergency', true] }, 1, 0] } },
+        broadcast: { $sum: { $cond: [{ $eq: ['$requestType', 'broadcast'] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  const receivedStats = await BloodRequest.aggregate([
+    { $match: { donorId: new mongoose.Types.ObjectId(id) } },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+        accepted: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } },
+        rejected: { $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  const sent = sentStats[0] || { total: 0, pending: 0, accepted: 0, rejected: 0, emergency: 0, broadcast: 0 };
+  const received = receivedStats[0] || { total: 0, pending: 0, accepted: 0, rejected: 0 };
+
+  const activity = {
+    totalRequestsSent: sent.total,
+    totalRequestsReceived: received.total,
+    acceptedRequests: user.role === 'donor' ? received.accepted : sent.accepted,
+    rejectedRequests: user.role === 'donor' ? received.rejected : sent.rejected,
+    pendingRequests: user.role === 'donor' ? received.pending : sent.pending,
+  };
+
+  let roleSpecificData = {};
+
+  if (user.role === 'donor') {
+    const lastDonation = await BloodRequest.findOne({ donorId: id, status: 'accepted' }).sort({ updatedAt: -1 });
+
+    const hospitalConnections = await HospitalDonor.aggregate([
+      { $match: { donorId: new mongoose.Types.ObjectId(id) } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'hospitalId',
+          foreignField: '_id',
+          as: 'hospital',
+        },
+      },
+      { $unwind: { path: '$hospital', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          hospitalId: 1,
+          hospitalName: '$hospital.hospitalName',
+          name: '$hospital.name',
+          email: '$hospital.email',
+          phoneNumber: '$hospital.phoneNumber',
+          city: '$hospital.city',
+          createdAt: 1,
+        },
+      },
+    ]);
+
+    const totalReceived = received.total;
+    const acceptedCount = received.accepted;
+    const acceptanceRate = totalReceived > 0 ? Math.round((acceptedCount / totalReceived) * 100) : 0;
+
+    roleSpecificData = {
+      availabilityStatus: user.availability,
+      lastDonationDate: lastDonation ? lastDonation.updatedAt : null,
+      totalDonations: acceptedCount,
+      canContact: true,
+      emergencyEligible: user.availability,
+      requestStats: {
+        received: totalReceived,
+        accepted: acceptedCount,
+        rejected: received.rejected,
+        acceptanceRate,
+      },
+      hospitalConnections: {
+        count: hospitalConnections.length,
+        hospitals: hospitalConnections,
+      },
+    };
+  } else if (user.role === 'hospital') {
+    const totalSavedDonors = await HospitalDonor.countDocuments({ hospitalId: id });
+    const lastDonorAddedDoc = await HospitalDonor.findOne({ hospitalId: id }).sort({ createdAt: -1 });
+
+    roleSpecificData = {
+      requestsCreated: sent.total,
+      broadcastRequestsCreated: sent.broadcast,
+      donorsSaved: totalSavedDonors,
+      emergencyRequests: sent.emergency,
+      directoryInformation: {
+        totalSavedDonors,
+        lastDonorAdded: lastDonorAddedDoc
+          ? {
+              name: lastDonorAddedDoc.name,
+              createdAt: lastDonorAddedDoc.createdAt,
+            }
+          : null,
+      },
+    };
+  }
+
+  res.status(200).json({
+    success: true,
+    user: formatAdminUser(user),
+    activity,
+    roleSpecificData,
   });
 });

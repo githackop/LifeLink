@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Ban, CheckCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Search, Ban, CheckCircle, Trash2, RefreshCw, Eye } from 'lucide-react';
 import { showError, showSuccess } from '../../utils/toast';
 import {
   getAdminUsers,
@@ -11,6 +11,7 @@ import { getErrorMessage } from '../../services/api';
 import { roleLabels } from '../../utils/roleConfig';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import AdminUserDetailsModal from '../../components/admin/AdminUserDetailsModal';
 
 const ROLES = ['user', 'donor', 'hospital', 'admin'];
 
@@ -20,6 +21,13 @@ const AdminUsers = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [actionId, setActionId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+
+  const handleViewDetails = (user) => {
+    setSelectedUserId(user._id);
+    setDetailsModalOpen(true);
+  };
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -164,6 +172,14 @@ const AdminUsers = () => {
                       </td>
                       <td className="px-6 py-3">
                         <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewDetails(u)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View Details
+                          </button>
                           {u.role !== 'admin' && (
                             <>
                               <button
@@ -205,6 +221,15 @@ const AdminUsers = () => {
           </div>
         )}
       </motion.div>
+
+      <AdminUserDetailsModal
+        userId={selectedUserId}
+        open={detailsModalOpen}
+        onClose={() => {
+          setDetailsModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
     </div>
   );
 };

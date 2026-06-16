@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Filter, Trash2, RefreshCw, MapPin, Droplets } from 'lucide-react';
+import { Filter, Trash2, RefreshCw, MapPin, Droplets, Eye } from 'lucide-react';
 import { showError, showSuccess } from '../../utils/toast';
 import { getAdminDonors, deleteAdminDonor } from '../../services/adminService';
 import { getErrorMessage } from '../../services/api';
 import { BLOOD_GROUPS } from '../../utils/bloodGroups';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import AdminUserDetailsModal from '../../components/admin/AdminUserDetailsModal';
 
 const AdminDonors = () => {
   const [donors, setDonors] = useState([]);
@@ -14,6 +15,13 @@ const AdminDonors = () => {
   const [bloodGroup, setBloodGroup] = useState('');
   const [city, setCity] = useState('');
   const [actionId, setActionId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+
+  const handleViewDetails = (donor) => {
+    setSelectedUserId(donor._id);
+    setDetailsModalOpen(true);
+  };
 
   const fetchDonors = useCallback(async () => {
     setLoading(true);
@@ -155,15 +163,25 @@ const AdminDonors = () => {
                         </span>
                       </td>
                       <td className="px-6 py-3 text-right">
-                        <button
-                          type="button"
-                          disabled={actionId === d._id}
-                          onClick={() => handleDelete(d)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Delete
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewDetails(d)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            disabled={actionId === d._id}
+                            onClick={() => handleDelete(d)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -173,6 +191,15 @@ const AdminDonors = () => {
           </div>
         )}
       </motion.div>
+
+      <AdminUserDetailsModal
+        userId={selectedUserId}
+        open={detailsModalOpen}
+        onClose={() => {
+          setDetailsModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
     </div>
   );
 };
