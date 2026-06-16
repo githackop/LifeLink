@@ -1,6 +1,6 @@
 import HospitalDonor from '../models/HospitalDonor.js';
 import asyncHandler from '../utils/asyncHandler.js';
-
+import { emitHospitalDonorAdded } from '../sockets/socketManager.js';
 
 // ======================================
 // GET HOSPITAL DONORS
@@ -93,6 +93,9 @@ export const addManualHospitalDonor = asyncHandler(async (req, res) => {
     totalDonations: 1,
     canContact: true,
   });
+
+  // Trigger notification for directory addition
+  await emitHospitalDonorAdded(hospitalId, name, bloodGroup.toUpperCase());
 
   // =========================
   // RESPONSE

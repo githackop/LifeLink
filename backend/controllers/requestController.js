@@ -1,10 +1,11 @@
 import BloodRequest from '../models/BloodRequest.js';
 import User from '../models/User.js';
 import HospitalDonor from '../models/HospitalDonor.js';
+import Notification from '../models/Notification.js';
 import { BLOOD_GROUPS } from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
-import { emitNewRequest, emitRequestResponse, emitAdminUpdate, emitBroadcastRequest } from '../sockets/socketManager.js';
+import { emitNewRequest, emitRequestResponse, emitAdminUpdate, emitBroadcastRequest, emitHospitalDonorAdded, emitHospitalDonorUpdated, emitToUser } from '../sockets/socketManager.js';
 
 const requesterFields = 'name email role phoneNumber hospitalName city';
 const donorFields = 'name email bloodGroup city availability phoneNumber';
@@ -162,6 +163,7 @@ export const createRequest = asyncHandler(async (req, res) => {
       city: bloodRequest.city,
       message: formatted.message,
       emergencyLevel: bloodRequest.emergencyLevel,
+      emergency: formatted.emergency,
       createdAt: formatted.createdAt,
     });
 
@@ -453,6 +455,9 @@ export const completeRequest = asyncHandler(async (req, res) => {
       existing.city = donor.city;
 
       await existing.save();
+
+      // Trigger Donor Updated alert for hospital
+      await emitHospitalDonorUpdated(hospitalId, donor.name);
     } else {
       await HospitalDonor.create({
         hospitalId,
@@ -469,6 +474,9 @@ export const completeRequest = asyncHandler(async (req, res) => {
         totalDonations: 1,
         lastDonationDate: new Date(),
       });
+
+      // Trigger Donor Added alert for hospital
+      await emitHospitalDonorAdded(hospitalId, donor.name, bloodRequest.bloodGroup);
     }
   }
 
@@ -483,5 +491,54 @@ export const completeRequest = asyncHandler(async (req, res) => {
     success: true,
     message: 'Donation marked as completed',
     request: formatted,
+  });
+});
+
+// Hospital responds to a broadcast request
+export const respondToBroadcastRequest = asyncHandler(async (req, res) => {
+  const bloodRequest = await BloodRequest.findById(req.params.id);
+
+  if (!bloodRequest) {
+    throw new AppError('Blood request not found', 404);
+  }
+
+  if (req.user.role !== 'hospital') {
+    throw new AppError('Only hospitals can respond to blood requests', 403);
+  }
+
+  const hospitalName = req.user.hospitalName || req.user.name;
+  const title = 'Hospital Response';
+  const message = `${hospitalName} responded to your blood request`;
+  const metadata = {
+    hospitalName,
+    requestId: bloodRequest._id.toString(),
+  };
+
+  const notification = await Notification.create({
+    recipientId: bloodRequest.requesterId,
+    type: 'request_response',
+    title,
+    message,
+    metadata,
+  });
+
+  const body = {
+    _id: notification._id.toString(),
+    type: 'request_response',
+    read: false,
+    title,
+    message,
+    createdAt: notification.createdAt.toISOString(),
+    metadata,
+    status: 'hospital_responded',
+    hospitalName,
+    requestId: bloodRequest._id.toString(),
+  };
+
+  emitToUser(bloodRequest.requesterId, 'request_response', body);
+
+  res.status(200).json({
+    success: true,
+    message: 'Response sent to the requester',
   });
 });

@@ -23,3 +23,6 @@ export const getBroadcastRequests = (params) =>
 
 export const volunteerForRequest = (id) =>
   api.post(`/requests/${id}/volunteer`);
+
+export const respondToBroadcastRequest = (id) =>
+  api.post(`/requests/${id}/hospital-respond`);

@@ -18,15 +18,23 @@ const formatTime = (iso) => {
   const date = new Date(iso);
   const now = new Date();
   const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
 
+  if (diffSecs < 10) return 'Just now';
   if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins === 1) return '1 minute ago';
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  if (diffHours === 1) return '1 hour ago';
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
   return date.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    year: 'numeric',
   });
 };
 
@@ -160,37 +168,69 @@ const NotificationBell = () => {
                 </div>
               ) : (
                 <ul className="divide-y divide-slate-100">
-                  {notifications.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => markAsRead(item.id)}
-                        className={`w-full text-left px-4 py-3 hover:bg-slate-50/80 transition-colors
-                          ${!item.read ? 'bg-brand-50/40' : ''}`}
-                      >
-                        <div className="flex gap-3">
-                          <div
-                            className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${iconClassFor(item)}`}
-                          >
-                            <NotificationIcon item={item} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-slate-900 leading-snug">
-                              {item.title}
-                            </p>
-                            {item.body ? (
-                              <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                                {item.body}
+                  {notifications.map((item) => {
+                    const isHospitalRelated = 
+                      item.metadata?.hospitalName || 
+                      item.requesterName?.toLowerCase().includes('hospital') || 
+                      item.title?.toLowerCase().includes('hospital') || 
+                      item.body?.toLowerCase().includes('hospital') ||
+                      item.message?.toLowerCase().includes('hospital');
+
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => markAsRead(item.id)}
+                          className={`w-full text-left px-4 py-3 hover:bg-slate-50/80 transition-colors relative
+                            ${!item.read ? 'bg-brand-50/40' : ''}`}
+                        >
+                          <div className="flex gap-3">
+                            <div
+                              className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${iconClassFor(item)}`}
+                            >
+                              <NotificationIcon item={item} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-slate-900 leading-snug pr-4">
+                                {item.title}
                               </p>
-                            ) : null}
-                            <p className="text-[10px] text-slate-400 mt-1">
-                              {formatTime(item.createdAt)}
-                            </p>
+                              {item.body || item.message ? (
+                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
+                                  {item.body || item.message}
+                                </p>
+                              ) : null}
+
+                              {/* Badges container */}
+                              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                {item.bloodGroup && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-100/50">
+                                    🩸 {item.bloodGroup}
+                                  </span>
+                                )}
+                                {item.emergency && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 text-[10px] font-bold border border-amber-200/50 uppercase tracking-wider">
+                                    ⚠️ Emergency
+                                  </span>
+                                )}
+                                {isHospitalRelated && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-100/50">
+                                    🏥 Hospital
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-[10px] text-slate-400 mt-1.5">
+                                {formatTime(item.createdAt)}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
+                          {!item.read && (
+                            <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-brand-600 ring-2 ring-white" />
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

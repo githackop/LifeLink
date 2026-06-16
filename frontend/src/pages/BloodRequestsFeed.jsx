@@ -23,6 +23,7 @@ import {
   getBroadcastRequests,
   volunteerForRequest,
   createRequest,
+  respondToBroadcastRequest,
 } from '../services/requestService';
 import { getErrorMessage } from '../services/api';
 import { showError, showSuccess } from '../utils/toast';
@@ -142,6 +143,19 @@ const BloodRequestsFeed = () => {
       setRequests((prev) =>
         prev.map((r) => (r._id === id ? data.request : r))
       );
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Hospital response logic
+  const handleHospitalRespond = async (id) => {
+    setActionLoadingId(id);
+    try {
+      await respondToBroadcastRequest(id);
+      showSuccess('Response sent to the requester successfully!');
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -461,13 +475,23 @@ const BloodRequestsFeed = () => {
                       )}
                     </div>
 
-                    <Link
-                      to={`/hospital-donors`}
-                      className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-500 font-semibold transition-colors"
-                    >
-                      <Search className="w-4 h-4" />
-                      Search Hospital Donor Directory
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleHospitalRespond(request._id)}
+                        loading={actionLoadingId === request._id}
+                        className="text-xs font-semibold py-1.5 px-3 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200"
+                      >
+                        Respond to Request
+                      </Button>
+                      <Link
+                        to={`/hospital-donors`}
+                        className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-500 font-semibold transition-colors"
+                      >
+                        <Search className="w-4 h-4" />
+                        Search Directory
+                      </Link>
+                    </div>
                   </div>
                 )}
               </motion.article>
