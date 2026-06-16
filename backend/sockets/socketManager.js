@@ -104,55 +104,117 @@ export const emitToAdmins = (event, payload) => {
   emitToRoom('role:admin', event, payload);
 };
 
-export const emitBroadcastRequest = (payload) => {
-  const body = {
-    requestId: payload.requestId?.toString(),
-    requesterId: payload.requesterId?.toString(),
-    requesterName: payload.requesterName,
-    bloodGroup: payload.bloodGroup,
-    city: payload.city,
-    message: payload.message ?? null,
-    emergencyLevel: payload.emergencyLevel,
-    createdAt: payload.createdAt || new Date().toISOString(),
-  };
+export const emitBroadcastRequest = async (payload) => {
+  try {
+    const isEmergency = Boolean(payload.emergency);
+    const bloodGroup = payload.bloodGroup || '';
+    const city = payload.city || '';
+    const requesterName = payload.requesterName || 'Someone';
 
-  emitToRoom('role:donor', 'broadcast_request', body);
-  emitToRoom('role:hospital', 'broadcast_request', body);
-  emitToRoom('role:admin', 'broadcast_request', body);
+    const title = 'Community Blood Request';
+    const message = isEmergency
+      ? `Emergency ${bloodGroup} blood request posted in ${city}`
+      : `An ${bloodGroup} blood request has been posted in ${city}`;
+
+    const metadata = {
+      requesterName,
+      city,
+      bloodGroup,
+      emergency: isEmergency,
+      requestId: payload.requestId?.toString(),
+    };
+
+    // Save to DB for all donors, hospitals, and admins
+    const recipients = await User.find({ role: { $in: ['donor', 'hospital', 'admin'] } });
+
+    const notificationPromises = recipients.map((recipient) =>
+      Notification.create({
+        recipientId: recipient._id,
+        type: 'broadcast_request',
+        title,
+        message,
+        metadata,
+      })
+    );
+
+    const notifications = await Promise.all(notificationPromises);
+    const sampleNotification = notifications[0];
+
+    const body = {
+      _id: sampleNotification?._id?.toString() || new Date().getTime().toString(),
+      type: 'broadcast_request',
+      read: false,
+      title,
+      message,
+      createdAt: sampleNotification?.createdAt?.toISOString() || new Date().toISOString(),
+      metadata,
+      requestId: payload.requestId?.toString(),
+      requesterId: payload.requesterId?.toString(),
+      requesterName,
+      bloodGroup,
+      city,
+      emergency: isEmergency,
+    };
+
+    emitToRoom('role:donor', 'broadcast_request', body);
+    emitToRoom('role:hospital', 'broadcast_request', body);
+    emitToRoom('role:admin', 'broadcast_request', body);
+  } catch (err) {
+    console.error('Error in emitBroadcastRequest:', err);
+  }
 };
 
 /** Blood request created — notify donor only */
 export const emitNewRequest = async (donorId, payload) => {
   try {
+    const requesterName = payload.requesterName || 'Someone';
+    const bloodGroup = payload.bloodGroup || '';
+    const city = payload.request?.requester?.city || payload.city || '';
+    const emergency = Boolean(payload.emergency);
+
+    let message = emergency
+      ? `Emergency: ${requesterName} urgently needs ${bloodGroup} blood in ${city}`
+      : `${requesterName} needs ${bloodGroup} blood in ${city}`;
+
+    if (payload.message) {
+      message += ` Message: ${payload.message}`;
+    }
+
+    const title = 'New Blood Request';
+    const metadata = {
+      requesterName,
+      bloodGroup,
+      city,
+      emergency,
+      requestId: payload.requestId?.toString(),
+      requesterId: payload.requesterId?.toString(),
+      donorId: payload.donorId?.toString(),
+      message: payload.message ?? null,
+      request: payload.request,
+    };
+
     const notification = await Notification.create({
       recipientId: donorId,
       type: 'new_request',
-      title: `New request from ${payload.requesterName || 'someone'}`,
-      message: payload.message || `Blood group: ${payload.bloodGroup} needed`,
-      metadata: {
-        requestId: payload.requestId?.toString(),
-        requesterId: payload.requesterId?.toString(),
-        requesterName: payload.requesterName,
-        donorId: payload.donorId?.toString(),
-        bloodGroup: payload.bloodGroup,
-        message: payload.message ?? null,
-        emergency: Boolean(payload.emergency),
-        request: payload.request,
-      },
+      title,
+      message,
+      metadata,
     });
 
     const body = {
       _id: notification._id.toString(),
       type: 'new_request',
       read: false,
+      title,
+      message,
       createdAt: notification.createdAt.toISOString(),
+      metadata,
       requestId: payload.requestId?.toString(),
       requesterId: payload.requesterId?.toString(),
-      requesterName: payload.requesterName,
+      requesterName,
       donorId: payload.donorId?.toString(),
-      bloodGroup: payload.bloodGroup,
-      message: payload.message ?? null,
-      emergency: Boolean(payload.emergency),
+      bloodGroup,
+      emergency,
       request: payload.request,
     };
 
@@ -165,35 +227,58 @@ export const emitNewRequest = async (donorId, payload) => {
 /** Donor accepted/rejected — notify requester (user/hospital) only */
 export const emitRequestResponse = async (requesterId, payload) => {
   try {
+    const isAccepted = payload.status === 'accepted';
+    const donorName = payload.donorName || 'Someone';
+    const bloodGroup = payload.bloodGroup || '';
+    const donorPhone = payload.request?.donor?.phoneNumber || null;
+    const city = payload.request?.donor?.city || '';
+
+    let title = '';
+    let message = '';
+    let metadata = {};
+
+    if (isAccepted) {
+      title = 'Request Accepted';
+      message = `${donorName} accepted your ${bloodGroup} blood request`;
+      metadata = {
+        donorName,
+        donorPhone,
+        bloodGroup,
+        city,
+        requestId: payload.requestId?.toString(),
+      };
+    } else {
+      title = 'Request Rejected';
+      message = `${donorName} is currently unavailable to donate ${bloodGroup} blood`;
+      metadata = {
+        donorName,
+        bloodGroup,
+        requestId: payload.requestId?.toString(),
+      };
+    }
+
     const notification = await Notification.create({
       recipientId: requesterId,
       type: 'request_response',
-      title: `Request ${payload.status}`,
-      message: payload.donorName
-        ? `${payload.donorName} ${payload.status} your request`
-        : `Your blood request was ${payload.status}`,
-      metadata: {
-        requestId: payload.requestId?.toString(),
-        donorId: payload.donorId?.toString(),
-        donorName: payload.donorName,
-        requesterId: payload.requesterId?.toString(),
-        status: payload.status,
-        bloodGroup: payload.bloodGroup,
-        request: payload.request,
-      },
+      title,
+      message,
+      metadata,
     });
 
     const body = {
       _id: notification._id.toString(),
       type: 'request_response',
       read: false,
+      title,
+      message,
       createdAt: notification.createdAt.toISOString(),
+      metadata,
       requestId: payload.requestId?.toString(),
       donorId: payload.donorId?.toString(),
-      donorName: payload.donorName,
-      requesterId: payload.requesterId?.toString(),
+      donorName,
+      requesterId: requesterId.toString(),
       status: payload.status,
-      bloodGroup: payload.bloodGroup,
+      bloodGroup,
       request: payload.request,
     };
 
@@ -208,6 +293,76 @@ export const emitRequestResponse = async (requesterId, payload) => {
 
 /** @deprecated alias */
 export const emitRequestUpdated = emitRequestResponse;
+
+export const emitHospitalDonorAdded = async (hospitalId, donorName, bloodGroup) => {
+  try {
+    const title = 'Donor Added';
+    const message = `${donorName} (${bloodGroup}) was added to your emergency donor directory`;
+    const metadata = {
+      donorName,
+      bloodGroup,
+    };
+
+    const notification = await Notification.create({
+      recipientId: hospitalId,
+      type: 'request_response',
+      title,
+      message,
+      metadata,
+    });
+
+    const body = {
+      _id: notification._id.toString(),
+      type: 'request_response',
+      read: false,
+      title,
+      message,
+      createdAt: notification.createdAt.toISOString(),
+      metadata,
+      status: 'donor_added',
+      donorName,
+      bloodGroup,
+    };
+
+    emitToUser(hospitalId, 'request_response', body);
+  } catch (err) {
+    console.error('Error in emitHospitalDonorAdded:', err);
+  }
+};
+
+export const emitHospitalDonorUpdated = async (hospitalId, donorName) => {
+  try {
+    const title = 'Donor Updated';
+    const message = `${donorName}'s emergency contact information was updated`;
+    const metadata = {
+      donorName,
+    };
+
+    const notification = await Notification.create({
+      recipientId: hospitalId,
+      type: 'request_response',
+      title,
+      message,
+      metadata,
+    });
+
+    const body = {
+      _id: notification._id.toString(),
+      type: 'request_response',
+      read: false,
+      title,
+      message,
+      createdAt: notification.createdAt.toISOString(),
+      metadata,
+      status: 'donor_updated',
+      donorName,
+    };
+
+    emitToUser(hospitalId, 'request_response', body);
+  } catch (err) {
+    console.error('Error in emitHospitalDonorUpdated:', err);
+  }
+};
 
 const ADMIN_MESSAGES = {
   user_blocked: 'A user account was blocked',
@@ -225,18 +380,99 @@ const ADMIN_MESSAGES = {
 /** Platform admin actions — admins only */
 export const emitAdminUpdate = async (payload) => {
   try {
+    const action = payload.action;
+    const user = payload.user || {};
+    const request = payload.request || {};
+    const requester = request.requester || {};
+    const donor = request.donor || {};
+
+    let title = 'Platform Update';
+    let message = 'A platform action occurred';
+
+    switch (action) {
+      case 'user_registered':
+        title = 'New User Registered';
+        message = `${user.name || 'A user'} joined LifeLink from ${user.city || 'Hyderabad'}`;
+        break;
+      case 'donor_registered':
+        title = 'New Donor Registered';
+        message = `${user.name || 'A donor'} (${user.bloodGroup || 'A+'}) registered as a donor from ${user.city || 'Vijayawada'}`;
+        break;
+      case 'hospital_registered':
+        title = 'Hospital Registration Pending';
+        message = `${user.hospitalName || user.name || 'A hospital'} submitted verification documents`;
+        break;
+      case 'hospital_verified':
+        title = 'Hospital Verified';
+        message = `${user.hospitalName || user.name || 'A hospital'} has been successfully verified`;
+        break;
+      case 'hospital_blocked':
+        title = 'Hospital Blocked';
+        message = `${user.hospitalName || user.name || 'A hospital'} access was restricted by admin`;
+        break;
+      case 'hospital_unblocked':
+        title = 'Hospital Restored';
+        message = `${user.hospitalName || user.name || 'A hospital'} access was restored`;
+        break;
+      case 'user_blocked':
+        title = 'User Blocked';
+        message = `${user.name || 'User'}'s account was blocked`;
+        break;
+      case 'user_unblocked':
+        title = 'User Restored';
+        message = `${user.name || 'User'}'s account was restored`;
+        break;
+      case 'request_created':
+        if (request.requestType === 'broadcast') {
+          title = 'Emergency Broadcast Request';
+          message = `${requester.hospitalName || requester.name || 'Someone'} created an urgent ${request.bloodGroup || 'O-'} blood request in ${request.city || 'Visakhapatnam'}`;
+        } else {
+          title = 'New Blood Request';
+          message = `${requester.hospitalName || requester.name || 'Someone'} requested ${request.bloodGroup || 'A+'} blood from ${donor.name || 'Donor'}`;
+        }
+        break;
+      case 'request_status_changed':
+        if (request.status === 'accepted') {
+          title = 'Donation Request Accepted';
+          message = `${donor.name || 'Donor'} accepted ${requester.hospitalName || requester.name || 'Requester'}'s blood request`;
+        } else if (request.status === 'rejected') {
+          title = 'Donation Request Rejected';
+          message = `${donor.name || 'Donor'} rejected ${requester.hospitalName || requester.name || 'Requester'}'s blood request`;
+        } else {
+          const volunteerCount = request.volunteers?.length || 0;
+          title = 'Donation Request Updated';
+          message = `${donor.name || 'Donor'} updated blood request to ${request.status || 'pending'} (Volunteers: ${volunteerCount})`;
+        }
+        break;
+      case 'user_deleted':
+        title = 'User Deleted';
+        message = `${user.name || 'User'}'s account was removed`;
+        break;
+      case 'donor_deleted':
+        title = 'Donor Deleted';
+        message = `${user.name || 'Donor'}'s donor account was removed`;
+        break;
+      case 'hospital_unverified':
+        title = 'Hospital Unverified';
+        message = `${user.hospitalName || user.name || 'A hospital'}'s verification was removed`;
+        break;
+      default:
+        title = payload.title || 'Platform Update';
+        message = payload.message || ADMIN_MESSAGES[action] || 'A platform update occurred';
+        break;
+    }
+
     const admins = await User.find({ role: 'admin' });
 
     const notificationPromises = admins.map((admin) =>
       Notification.create({
         recipientId: admin._id,
         type: 'admin_update',
-        title: payload.message || ADMIN_MESSAGES[payload.action] || 'Platform update',
-        message: payload.action?.replace(/_/g, ' ') || 'Platform action',
+        title,
+        message,
         metadata: {
-          action: payload.action,
+          action,
           targetUserId: payload.targetUserId?.toString() || null,
-          message: payload.message || ADMIN_MESSAGES[payload.action] || 'Platform update',
           user: payload.user,
           request: payload.request,
         },
@@ -250,10 +486,17 @@ export const emitAdminUpdate = async (payload) => {
       _id: sampleNotification?._id?.toString() || new Date().getTime().toString(),
       type: 'admin_update',
       read: false,
+      title,
+      message,
       createdAt: sampleNotification?.createdAt?.toISOString() || new Date().toISOString(),
-      action: payload.action,
+      metadata: {
+        action,
+        targetUserId: payload.targetUserId?.toString() || null,
+        user: payload.user,
+        request: payload.request,
+      },
+      action,
       targetUserId: payload.targetUserId?.toString() || null,
-      message: payload.message || ADMIN_MESSAGES[payload.action] || 'Platform update',
       user: payload.user,
       request: payload.request,
     };
@@ -271,4 +514,64 @@ export const emitAccountUpdate = (userId, payload) => {
     message: payload.message || 'Your account was updated by an administrator',
     createdAt: payload.createdAt || new Date().toISOString(),
   });
+};
+
+export const emitBroadcastResolved = async (payload) => {
+  try {
+    const resolverName = payload.resolverName || 'Someone';
+    const bloodGroup = payload.bloodGroup || '';
+    const city = payload.city || '';
+    const title = 'Emergency Request Resolved';
+    const message = `${resolverName} marked the ${bloodGroup} emergency request in ${city} as resolved.`;
+
+    const metadata = {
+      resolverName,
+      city,
+      bloodGroup,
+      requestId: payload.requestId?.toString(),
+    };
+
+    // Save to DB for all donors, hospitals, and admins
+    const recipients = await User.find({ role: { $in: ['donor', 'hospital', 'admin'] } });
+
+    const notificationPromises = recipients.map((recipient) =>
+      Notification.create({
+        recipientId: recipient._id,
+        type: 'broadcast_request',
+        title,
+        message,
+        metadata,
+      })
+    );
+
+    const notifications = await Promise.all(notificationPromises);
+    const sampleNotification = notifications[0];
+
+    const body = {
+      _id: sampleNotification?._id?.toString() || new Date().getTime().toString(),
+      type: 'broadcast_request',
+      read: false,
+      title,
+      message,
+      createdAt: sampleNotification?.createdAt?.toISOString() || new Date().toISOString(),
+      metadata,
+      requestId: payload.requestId?.toString(),
+      status: 'closed',
+    };
+
+    emitToRoom('role:donor', 'broadcast_resolved', body);
+    emitToRoom('role:hospital', 'broadcast_resolved', body);
+    emitToRoom('role:admin', 'broadcast_resolved', body);
+  } catch (err) {
+    console.error('Error in emitBroadcastResolved:', err);
+  }
+};
+
+export const emitBroadcastDeleted = (payload) => {
+  const body = {
+    requestId: payload.requestId?.toString(),
+  };
+  emitToRoom('role:donor', 'broadcast_deleted', body);
+  emitToRoom('role:hospital', 'broadcast_deleted', body);
+  emitToRoom('role:admin', 'broadcast_deleted', body);
 };

@@ -4,6 +4,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
 import { sendTokenResponse } from '../utils/generateToken.js';
 import { sendPasswordResetEmail } from '../services/emailService.js';
+import { emitAdminUpdate } from '../sockets/socketManager.js';
 
 const buildUserPayload = (body) => {
   const {
@@ -55,6 +56,31 @@ export const register = asyncHandler(async (req, res) => {
   }
 
   const user = await User.create(buildUserPayload(req.body));
+
+  // Determine administrative notification action
+  let action = 'user_registered';
+  if (user.role === 'donor') {
+    action = 'donor_registered';
+  } else if (user.role === 'hospital') {
+    action = 'hospital_registered';
+  }
+
+  emitAdminUpdate({
+    action,
+    targetUserId: user._id.toString(),
+    user: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      city: user.city,
+      bloodGroup: user.bloodGroup,
+      hospitalName: user.hospitalName,
+      licenseNumber: user.licenseNumber,
+    },
+    createdAt: user.createdAt || new Date().toISOString(),
+  });
+
   sendTokenResponse(user, 201, res);
 });
 

@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
 import User, { BLOOD_GROUPS, ROLES } from '../models/User.js';
 import BloodRequest from '../models/BloodRequest.js';
+import HospitalDonor from '../models/HospitalDonor.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
-import { emitAdminUpdate, emitAccountUpdate } from '../sockets/socketManager.js';
+import { emitAdminUpdate, emitAccountUpdate, emitToUser, emitBroadcastDeleted } from '../sockets/socketManager.js';
+import Notification from '../models/Notification.js';
 
 const requesterFields = 'name email role hospitalName';
 const donorFields = 'name bloodGroup';
@@ -56,6 +58,8 @@ export const getStats = asyncHandler(async (req, res) => {
     recentRequests,
     totalBroadcastRequests,
     activeBroadcastRequests,
+    resolvedBroadcastRequests,
+    deletedBroadcastRequests,
     volunteersRes,
     broadcastDemandStats,
   ] = await Promise.all([
@@ -74,23 +78,26 @@ export const getStats = asyncHandler(async (req, res) => {
     ]),
     User.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }, { $sort: { _id: 1 } }]),
     BloodRequest.aggregate([
+      { $match: { isDeleted: { $ne: true } } },
       { $group: { _id: '$status', count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
-    BloodRequest.find()
+    BloodRequest.find({ isDeleted: { $ne: true } })
       .sort({ createdAt: -1 })
       .limit(8)
       .populate('requesterId', requesterFields)
       .populate('donorId', donorFields),
-    BloodRequest.countDocuments({ requestType: 'broadcast' }),
-    BloodRequest.countDocuments({ requestType: 'broadcast', status: 'pending' }),
+    BloodRequest.countDocuments({ requestType: 'broadcast', isDeleted: { $ne: true } }),
+    BloodRequest.countDocuments({ requestType: 'broadcast', status: { $in: ['active', 'pending'] }, isDeleted: { $ne: true } }),
+    BloodRequest.countDocuments({ requestType: 'broadcast', status: 'closed', isDeleted: { $ne: true } }),
+    BloodRequest.countDocuments({ requestType: 'broadcast', isDeleted: true }),
     BloodRequest.aggregate([
-      { $match: { requestType: 'broadcast' } },
+      { $match: { requestType: 'broadcast', isDeleted: { $ne: true } } },
       { $project: { volunteersCount: { $size: { $ifNull: ['$volunteers', []] } } } },
       { $group: { _id: null, total: { $sum: '$volunteersCount' } } }
     ]),
     BloodRequest.aggregate([
-      { $match: { requestType: 'broadcast' } },
+      { $match: { requestType: 'broadcast', isDeleted: { $ne: true } } },
       { $group: { _id: '$bloodGroup', count: { $sum: 1 } } }
     ])
   ]);
@@ -115,6 +122,8 @@ export const getStats = asyncHandler(async (req, res) => {
         totalRequests: requestStatusBreakdown.reduce((sum, r) => sum + r.count, 0),
         totalBroadcastRequests,
         activeBroadcastRequests,
+        resolvedBroadcastRequests,
+        deletedBroadcastRequests,
         totalVolunteers,
         bloodGroupDemand,
       },
@@ -320,6 +329,37 @@ export const toggleHospitalVerify = asyncHandler(async (req, res) => {
 
   notifyAdminChange(hospital.isVerified ? 'hospital_verified' : 'hospital_unverified', hospital);
 
+  if (hospital.isVerified) {
+    const title = 'Hospital Verified';
+    const message = 'Your hospital account has been approved. You now have full access to hospital features.';
+    
+    const notification = await Notification.create({
+      recipientId: hospital._id,
+      type: 'request_response',
+      title,
+      message,
+      metadata: {
+        hospitalId: hospital._id.toString(),
+      },
+    });
+
+    const body = {
+      _id: notification._id.toString(),
+      type: 'request_response',
+      read: false,
+      title,
+      message,
+      createdAt: notification.createdAt.toISOString(),
+      metadata: {
+        hospitalId: hospital._id.toString(),
+      },
+      status: 'hospital_verified',
+      donorName: hospital.hospitalName || hospital.name,
+    };
+
+    emitToUser(hospital._id, 'request_response', body);
+  }
+
   res.status(200).json({
     success: true,
     message: hospital.isVerified
@@ -361,5 +401,159 @@ export const toggleHospitalBlock = asyncHandler(async (req, res) => {
       ? 'Hospital blocked successfully'
       : 'Hospital unblocked successfully',
     hospital: formatAdminUser(hospital),
+  });
+});
+
+export const getUserDetails = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateObjectId(id);
+
+  const user = await User.findById(id);
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Get aggregated request stats using MongoDB aggregation
+  const sentStats = await BloodRequest.aggregate([
+    { $match: { requesterId: new mongoose.Types.ObjectId(id) } },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+        accepted: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } },
+        rejected: { $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] } },
+        emergency: { $sum: { $cond: [{ $eq: ['$emergency', true] }, 1, 0] } },
+        broadcast: { $sum: { $cond: [{ $eq: ['$requestType', 'broadcast'] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  const receivedStats = await BloodRequest.aggregate([
+    { $match: { donorId: new mongoose.Types.ObjectId(id) } },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+        accepted: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } },
+        rejected: { $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  const sent = sentStats[0] || { total: 0, pending: 0, accepted: 0, rejected: 0, emergency: 0, broadcast: 0 };
+  const received = receivedStats[0] || { total: 0, pending: 0, accepted: 0, rejected: 0 };
+
+  const activity = {
+    totalRequestsSent: sent.total,
+    totalRequestsReceived: received.total,
+    acceptedRequests: user.role === 'donor' ? received.accepted : sent.accepted,
+    rejectedRequests: user.role === 'donor' ? received.rejected : sent.rejected,
+    pendingRequests: user.role === 'donor' ? received.pending : sent.pending,
+  };
+
+  let roleSpecificData = {};
+
+  if (user.role === 'donor') {
+    const lastDonation = await BloodRequest.findOne({ donorId: id, status: 'accepted' }).sort({ updatedAt: -1 });
+
+    const hospitalConnections = await HospitalDonor.aggregate([
+      { $match: { donorId: new mongoose.Types.ObjectId(id) } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'hospitalId',
+          foreignField: '_id',
+          as: 'hospital',
+        },
+      },
+      { $unwind: { path: '$hospital', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          hospitalId: 1,
+          hospitalName: '$hospital.hospitalName',
+          name: '$hospital.name',
+          email: '$hospital.email',
+          phoneNumber: '$hospital.phoneNumber',
+          city: '$hospital.city',
+          createdAt: 1,
+        },
+      },
+    ]);
+
+    const totalReceived = received.total;
+    const acceptedCount = received.accepted;
+    const acceptanceRate = totalReceived > 0 ? Math.round((acceptedCount / totalReceived) * 100) : 0;
+
+    roleSpecificData = {
+      availabilityStatus: user.availability,
+      lastDonationDate: lastDonation ? lastDonation.updatedAt : null,
+      totalDonations: acceptedCount,
+      canContact: true,
+      emergencyEligible: user.availability,
+      requestStats: {
+        received: totalReceived,
+        accepted: acceptedCount,
+        rejected: received.rejected,
+        acceptanceRate,
+      },
+      hospitalConnections: {
+        count: hospitalConnections.length,
+        hospitals: hospitalConnections,
+      },
+    };
+  } else if (user.role === 'hospital') {
+    const totalSavedDonors = await HospitalDonor.countDocuments({ hospitalId: id });
+    const lastDonorAddedDoc = await HospitalDonor.findOne({ hospitalId: id }).sort({ createdAt: -1 });
+
+    roleSpecificData = {
+      requestsCreated: sent.total,
+      broadcastRequestsCreated: sent.broadcast,
+      donorsSaved: totalSavedDonors,
+      emergencyRequests: sent.emergency,
+      directoryInformation: {
+        totalSavedDonors,
+        lastDonorAdded: lastDonorAddedDoc
+          ? {
+              name: lastDonorAddedDoc.name,
+              createdAt: lastDonorAddedDoc.createdAt,
+            }
+          : null,
+      },
+    };
+  }
+
+  res.status(200).json({
+    success: true,
+    user: formatAdminUser(user),
+    activity,
+    roleSpecificData,
+  });
+});
+
+export const deleteBroadcast = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateObjectId(id);
+
+  const bloodRequest = await BloodRequest.findById(id);
+  if (!bloodRequest) {
+    throw new AppError('Broadcast request not found', 404);
+  }
+
+  if (bloodRequest.requestType !== 'broadcast') {
+    throw new AppError('Only broadcast requests can be deleted', 400);
+  }
+
+  bloodRequest.isDeleted = true;
+  await bloodRequest.save();
+
+  // Notify clients through sockets
+  emitBroadcastDeleted({ requestId: id });
+
+  res.status(200).json({
+    success: true,
+    message: 'Broadcast request deleted successfully',
   });
 });

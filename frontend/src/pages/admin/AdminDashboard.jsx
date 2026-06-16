@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Radio,
   ClipboardList,
+  Trash2,
 } from 'lucide-react';
 import {
   BarChart,
@@ -131,10 +132,12 @@ const AdminDashboard = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard title="Total Broadcasts" value={stats.totalBroadcastRequests ?? 0} icon={Radio} accent="rose" delay={0.05} />
         <StatCard title="Active Broadcasts" value={stats.activeBroadcastRequests ?? 0} icon={Droplets} accent="amber" delay={0.1} />
-        <StatCard title="Total Volunteers" value={stats.totalVolunteers ?? 0} icon={UserCheck} accent="emerald" delay={0.15} />
+        <StatCard title="Resolved Broadcasts" value={stats.resolvedBroadcastRequests ?? 0} icon={UserCheck} accent="emerald" delay={0.15} />
+        <StatCard title="Deleted Broadcasts" value={stats.deletedBroadcastRequests ?? 0} icon={Trash2} accent="violet" delay={0.2} />
+        <StatCard title="Total Volunteers" value={stats.totalVolunteers ?? 0} icon={UserCheck} accent="sky" delay={0.25} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

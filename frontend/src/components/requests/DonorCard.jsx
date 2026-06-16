@@ -2,10 +2,10 @@ import { motion } from 'framer-motion';
 import { Droplets, MapPin, Phone, Clock, Send, Check } from 'lucide-react';
 import Button from '../ui/Button';
 
-const DonorCard = ({ donor, index = 0, onSendRequest, actionLoading }) => {
+const DonorCard = ({ donor, index = 0, onSendRequest, actionLoading, disabledOverride = false }) => {
   const unavailable = !donor.availability;
   const pending = donor.hasPendingRequest;
-  const disabled = !donor.canRequest || actionLoading;
+  const disabled = !donor.canRequest || actionLoading || disabledOverride;
 
   let buttonLabel = 'Send Request';
   if (unavailable) buttonLabel = 'Unavailable';
@@ -67,7 +67,11 @@ const DonorCard = ({ donor, index = 0, onSendRequest, actionLoading }) => {
           className="w-full !py-2.5"
           disabled={disabled}
           variant={disabled && !pending ? 'secondary' : 'primary'}
-          onClick={() => onSendRequest(donor)}
+          title={disabledOverride ? "Available after admin verification" : ""}
+          onClick={() => {
+            if (disabledOverride) return;
+            onSendRequest(donor);
+          }}
         >
           {pending ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
           {buttonLabel}

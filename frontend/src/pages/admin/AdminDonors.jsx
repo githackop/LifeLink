@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Filter, Trash2, RefreshCw, MapPin, Droplets } from 'lucide-react';
+import { Filter, Trash2, RefreshCw, MapPin, Droplets, Eye } from 'lucide-react';
 import { showError, showSuccess } from '../../utils/toast';
 import { getAdminDonors, deleteAdminDonor } from '../../services/adminService';
 import { getErrorMessage } from '../../services/api';
 import { BLOOD_GROUPS } from '../../utils/bloodGroups';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import AdminUserDetailsModal from '../../components/admin/AdminUserDetailsModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 const AdminDonors = () => {
   const [donors, setDonors] = useState([]);
@@ -14,6 +16,39 @@ const AdminDonors = () => {
   const [bloodGroup, setBloodGroup] = useState('');
   const [city, setCity] = useState('');
   const [actionId, setActionId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+
+  // Reusable confirmation modal states
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [donorToDelete, setDonorToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleViewDetails = (donor) => {
+    setSelectedUserId(donor._id);
+    setDetailsModalOpen(true);
+  };
+
+  const handleDeleteClick = (donor) => {
+    setDonorToDelete(donor);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!donorToDelete) return;
+    setDeleteLoading(true);
+    try {
+      const { data } = await deleteAdminDonor(donorToDelete._id);
+      showSuccess(data.message);
+      setConfirmOpen(false);
+      setDonorToDelete(null);
+      fetchDonors();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const fetchDonors = useCallback(async () => {
     setLoading(true);
@@ -35,20 +70,6 @@ const AdminDonors = () => {
     const timer = setTimeout(fetchDonors, 300);
     return () => clearTimeout(timer);
   }, [fetchDonors]);
-
-  const handleDelete = async (donor) => {
-    if (!window.confirm(`Delete donor ${donor.name}? This cannot be undone.`)) return;
-    setActionId(donor._id);
-    try {
-      const { data } = await deleteAdminDonor(donor._id);
-      showSuccess(data.message);
-      fetchDonors();
-    } catch (err) {
-      showError(getErrorMessage(err));
-    } finally {
-      setActionId(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -155,15 +176,25 @@ const AdminDonors = () => {
                         </span>
                       </td>
                       <td className="px-6 py-3 text-right">
-                        <button
-                          type="button"
-                          disabled={actionId === d._id}
-                          onClick={() => handleDelete(d)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Delete
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewDetails(d)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deleteLoading}
+                            onClick={() => handleDeleteClick(d)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -173,6 +204,30 @@ const AdminDonors = () => {
           </div>
         )}
       </motion.div>
+
+      <AdminUserDetailsModal
+        userId={selectedUserId}
+        open={detailsModalOpen}
+        onClose={() => {
+          setDetailsModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Delete Donor Profile"
+        description={`Are you sure you want to delete donor ${donorToDelete?.name}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setDonorToDelete(null);
+        }}
+        loading={deleteLoading}
+        isDanger={true}
+      />
     </div>
   );
 };

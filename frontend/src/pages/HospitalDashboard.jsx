@@ -33,11 +33,21 @@ const HospitalDashboard = () => {
       const { data: res } = await getHospitalDashboard();
       setData(res.data);
     } catch (err) {
-      setError(getErrorMessage(err));
+      if (err.response?.status === 403) {
+        setData({
+          stats: {},
+          user: user,
+          donors: [],
+          emergencyRequests: [],
+          recentActivity: [],
+        });
+      } else {
+        setError(getErrorMessage(err));
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchDashboard();
@@ -50,6 +60,7 @@ const HospitalDashboard = () => {
   const profile = data?.user || user;
   const donors = data?.donors || [];
   const emergencyList = data?.emergencyRequests || [];
+  const isUnverified = user?.role === 'hospital' && !user?.isVerified;
 
   return (
     <div className="space-y-8">
@@ -127,16 +138,34 @@ const HospitalDashboard = () => {
             <AlertTriangle className="w-5 h-5 text-amber-500" />
             Recent emergency requests
           </h2>
-          <Link to="/emergency-requests" className="text-sm font-medium text-brand-600 hover:text-brand-500">
-            View all →
-          </Link>
+          {isUnverified ? (
+            <span
+              className="text-sm font-medium text-slate-400 cursor-not-allowed"
+              title="Available after admin verification"
+            >
+              View all →
+            </span>
+          ) : (
+            <Link to="/emergency-requests" className="text-sm font-medium text-brand-600 hover:text-brand-500">
+              View all →
+            </Link>
+          )}
         </div>
         {emergencyList.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/40 p-8 text-center">
             <p className="text-sm text-slate-600">No emergency requests yet.</p>
-            <Link to="/search-donors" className="inline-block mt-2 text-sm font-medium text-amber-700">
-              Send an emergency request →
-            </Link>
+            {isUnverified ? (
+              <span
+                className="inline-block mt-2 text-sm font-medium text-slate-400 cursor-not-allowed"
+                title="Available after admin verification"
+              >
+                Send an emergency request →
+              </span>
+            ) : (
+              <Link to="/search-donors" className="inline-block mt-2 text-sm font-medium text-amber-700">
+                Send an emergency request →
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -153,9 +182,18 @@ const HospitalDashboard = () => {
             <Users className="w-5 h-5 text-sky-500" />
             Donor database preview
           </h2>
-          <Link to="/donor-database" className="text-sm font-medium text-brand-600 hover:text-brand-500">
-            View all donors →
-          </Link>
+          {isUnverified ? (
+            <span
+              className="text-sm font-medium text-slate-400 cursor-not-allowed"
+              title="Available after admin verification"
+            >
+              View all donors →
+            </span>
+          ) : (
+            <Link to="/donor-database" className="text-sm font-medium text-brand-600 hover:text-brand-500">
+              View all donors →
+            </Link>
+          )}
         </div>
         {donors.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white/50 p-8 text-center">
@@ -171,13 +209,23 @@ const HospitalDashboard = () => {
       </section>
 
       <div className="flex flex-wrap gap-3">
-        <Link
-          to="/my-requests"
-          className="text-sm font-medium text-brand-600 bg-brand-50 px-4 py-2 rounded-xl border border-brand-100 inline-flex items-center gap-1.5"
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          All sent requests
-        </Link>
+        {isUnverified ? (
+          <span
+            className="text-sm font-medium text-slate-400 bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 inline-flex items-center gap-1.5 cursor-not-allowed"
+            title="Available after admin verification"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            All sent requests
+          </span>
+        ) : (
+          <Link
+            to="/my-requests"
+            className="text-sm font-medium text-brand-600 bg-brand-50 px-4 py-2 rounded-xl border border-brand-100 inline-flex items-center gap-1.5"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            All sent requests
+          </Link>
+        )}
       </div>
 
       <RecentActivity items={data?.recentActivity || []} />

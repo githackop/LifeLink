@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Ban, CheckCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Search, Ban, CheckCircle, Trash2, RefreshCw, Eye } from 'lucide-react';
 import { showError, showSuccess } from '../../utils/toast';
 import {
   getAdminUsers,
@@ -11,6 +11,8 @@ import { getErrorMessage } from '../../services/api';
 import { roleLabels } from '../../utils/roleConfig';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import AdminUserDetailsModal from '../../components/admin/AdminUserDetailsModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 const ROLES = ['user', 'donor', 'hospital', 'admin'];
 
@@ -20,6 +22,39 @@ const AdminUsers = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [actionId, setActionId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+
+  // Reusable confirmation modal states
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleViewDetails = (user) => {
+    setSelectedUserId(user._id);
+    setDetailsModalOpen(true);
+  };
+
+  const handleDeleteClick = (user) => {
+    setUserToDelete(user);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
+    setDeleteLoading(true);
+    try {
+      const { data } = await deleteAdminUser(userToDelete._id);
+      showSuccess(data.message);
+      setConfirmOpen(false);
+      setUserToDelete(null);
+      fetchUsers();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -55,19 +90,6 @@ const AdminUsers = () => {
     }
   };
 
-  const handleDelete = async (user) => {
-    if (!window.confirm(`Delete ${user.name}? This cannot be undone.`)) return;
-    setActionId(user._id);
-    try {
-      const { data } = await deleteAdminUser(user._id);
-      showSuccess(data.message);
-      fetchUsers();
-    } catch (err) {
-      showError(getErrorMessage(err));
-    } finally {
-      setActionId(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -164,6 +186,14 @@ const AdminUsers = () => {
                       </td>
                       <td className="px-6 py-3">
                         <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewDetails(u)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View Details
+                          </button>
                           {u.role !== 'admin' && (
                             <>
                               <button
@@ -186,8 +216,8 @@ const AdminUsers = () => {
                               </button>
                               <button
                                 type="button"
-                                disabled={actionId === u._id}
-                                onClick={() => handleDelete(u)}
+                                disabled={deleteLoading}
+                                onClick={() => handleDeleteClick(u)}
                                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -205,6 +235,30 @@ const AdminUsers = () => {
           </div>
         )}
       </motion.div>
+
+      <AdminUserDetailsModal
+        userId={selectedUserId}
+        open={detailsModalOpen}
+        onClose={() => {
+          setDetailsModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Delete User Account"
+        description={`Are you sure you want to delete ${userToDelete?.name}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setUserToDelete(null);
+        }}
+        loading={deleteLoading}
+        isDanger={true}
+      />
     </div>
   );
 };

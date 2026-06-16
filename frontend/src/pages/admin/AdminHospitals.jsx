@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Ban, CheckCircle, ShieldCheck, ShieldX, RefreshCw } from 'lucide-react';
+import { Building2, Ban, CheckCircle, ShieldCheck, ShieldX, RefreshCw, Eye } from 'lucide-react';
 import { showError, showSuccess } from '../../utils/toast';
 import {
   getAdminHospitals,
@@ -10,11 +10,19 @@ import {
 import { getErrorMessage } from '../../services/api';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import AdminUserDetailsModal from '../../components/admin/AdminUserDetailsModal';
 
 const AdminHospitals = () => {
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+
+  const handleViewDetails = (hospital) => {
+    setSelectedUserId(hospital._id);
+    setDetailsModalOpen(true);
+  };
 
   const fetchHospitals = useCallback(async () => {
     setLoading(true);
@@ -154,6 +162,14 @@ const AdminHospitals = () => {
                         <div className="flex justify-end flex-wrap gap-2">
                           <button
                             type="button"
+                            onClick={() => handleViewDetails(h)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View
+                          </button>
+                          <button
+                            type="button"
                             disabled={actionId?.startsWith(h._id)}
                             onClick={() => handleVerify(h)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 disabled:opacity-50"
@@ -198,6 +214,15 @@ const AdminHospitals = () => {
           </div>
         )}
       </motion.div>
+
+      <AdminUserDetailsModal
+        userId={selectedUserId}
+        open={detailsModalOpen}
+        onClose={() => {
+          setDetailsModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
     </div>
   );
 };

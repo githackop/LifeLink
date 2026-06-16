@@ -1,10 +1,11 @@
 import BloodRequest from '../models/BloodRequest.js';
 import User from '../models/User.js';
 import HospitalDonor from '../models/HospitalDonor.js';
+import Notification from '../models/Notification.js';
 import { BLOOD_GROUPS } from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
-import { emitNewRequest, emitRequestResponse, emitAdminUpdate, emitBroadcastRequest } from '../sockets/socketManager.js';
+import { emitNewRequest, emitRequestResponse, emitAdminUpdate, emitBroadcastRequest, emitBroadcastResolved, emitHospitalDonorAdded, emitHospitalDonorUpdated, emitToUser } from '../sockets/socketManager.js';
 
 const requesterFields = 'name email role phoneNumber hospitalName city';
 const donorFields = 'name email bloodGroup city availability phoneNumber';
@@ -41,6 +42,15 @@ export const formatRequest = (request) => {
       status: v.status,
       volunteeredAt: v.volunteeredAt,
     })) || [],
+    patientName: doc.patientName,
+    unitsRequired: doc.unitsRequired ?? 1,
+    location: doc.location,
+    requiredBefore: doc.requiredBefore,
+    reason: doc.reason,
+    allowContact: doc.allowContact ?? true,
+    resolvedAt: doc.resolvedAt,
+    resolvedBy: doc.resolvedBy,
+    isDeleted: doc.isDeleted ?? false,
   };
 };
 
@@ -126,6 +136,15 @@ export const createRequest = asyncHandler(async (req, res) => {
       request: formatted,
     });
   } else if (requestType === 'broadcast') {
+    const {
+      patientName,
+      unitsRequired,
+      location,
+      requiredBefore,
+      reason,
+      allowContact,
+    } = req.body;
+
     if (!bloodGroup || !BLOOD_GROUPS.includes(bloodGroup)) {
       throw new AppError('Valid blood group is required', 400);
     }
@@ -146,7 +165,13 @@ export const createRequest = asyncHandler(async (req, res) => {
       hospitalName: isHospital ? req.user.hospitalName : undefined,
       requestType: 'broadcast',
       emergencyLevel: emergencyLevel || (emergency ? 'urgent' : 'medium'),
-      status: 'pending',
+      status: 'active',
+      patientName: patientName?.trim() || undefined,
+      unitsRequired: Number(unitsRequired) || 1,
+      location: location?.trim() || undefined,
+      requiredBefore: requiredBefore ? new Date(requiredBefore) : undefined,
+      reason: reason || 'Custom Message',
+      allowContact: allowContact !== false,
     });
 
     const populated = await BloodRequest.findById(bloodRequest._id)
@@ -162,7 +187,14 @@ export const createRequest = asyncHandler(async (req, res) => {
       city: bloodRequest.city,
       message: formatted.message,
       emergencyLevel: bloodRequest.emergencyLevel,
+      emergency: formatted.emergency,
       createdAt: formatted.createdAt,
+      patientName: formatted.patientName,
+      unitsRequired: formatted.unitsRequired,
+      location: formatted.location,
+      requiredBefore: formatted.requiredBefore,
+      reason: formatted.reason,
+      allowContact: formatted.allowContact,
     });
 
     emitAdminUpdate({
@@ -182,8 +214,8 @@ export const createRequest = asyncHandler(async (req, res) => {
 });
 
 export const getBroadcastRequests = asyncHandler(async (req, res) => {
-  const { bloodGroup, city, emergencyLevel } = req.query;
-  const filter = { requestType: 'broadcast' };
+  const { bloodGroup, city, emergencyLevel, status } = req.query;
+  const filter = { requestType: 'broadcast', isDeleted: { $ne: true } };
 
   if (bloodGroup && BLOOD_GROUPS.includes(bloodGroup)) {
     filter.bloodGroup = bloodGroup;
@@ -193,6 +225,9 @@ export const getBroadcastRequests = asyncHandler(async (req, res) => {
   }
   if (emergencyLevel) {
     filter.emergencyLevel = emergencyLevel;
+  }
+  if (status) {
+    filter.status = status;
   }
 
   const requests = await BloodRequest.find(filter)
@@ -453,6 +488,9 @@ export const completeRequest = asyncHandler(async (req, res) => {
       existing.city = donor.city;
 
       await existing.save();
+
+      // Trigger Donor Updated alert for hospital
+      await emitHospitalDonorUpdated(hospitalId, donor.name);
     } else {
       await HospitalDonor.create({
         hospitalId,
@@ -469,6 +507,9 @@ export const completeRequest = asyncHandler(async (req, res) => {
         totalDonations: 1,
         lastDonationDate: new Date(),
       });
+
+      // Trigger Donor Added alert for hospital
+      await emitHospitalDonorAdded(hospitalId, donor.name, bloodRequest.bloodGroup);
     }
   }
 
@@ -482,6 +523,98 @@ export const completeRequest = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Donation marked as completed',
+    request: formatted,
+  });
+});
+
+// Hospital responds to a broadcast request
+export const respondToBroadcastRequest = asyncHandler(async (req, res) => {
+  const bloodRequest = await BloodRequest.findById(req.params.id);
+
+  if (!bloodRequest) {
+    throw new AppError('Blood request not found', 404);
+  }
+
+  if (req.user.role !== 'hospital') {
+    throw new AppError('Only hospitals can respond to blood requests', 403);
+  }
+
+  const hospitalName = req.user.hospitalName || req.user.name;
+  const title = 'Hospital Response';
+  const message = `${hospitalName} responded to your blood request`;
+  const metadata = {
+    hospitalName,
+    requestId: bloodRequest._id.toString(),
+  };
+
+  const notification = await Notification.create({
+    recipientId: bloodRequest.requesterId,
+    type: 'request_response',
+    title,
+    message,
+    metadata,
+  });
+
+  const body = {
+    _id: notification._id.toString(),
+    type: 'request_response',
+    read: false,
+    title,
+    message,
+    createdAt: notification.createdAt.toISOString(),
+    metadata,
+    status: 'hospital_responded',
+    hospitalName,
+    requestId: bloodRequest._id.toString(),
+  };
+
+  emitToUser(bloodRequest.requesterId, 'request_response', body);
+
+  res.status(200).json({
+    success: true,
+    message: 'Response sent to the requester',
+  });
+});
+
+export const closeBroadcastRequest = asyncHandler(async (req, res) => {
+  const bloodRequest = await populateRequest(BloodRequest.findById(req.params.id));
+  if (!bloodRequest) {
+    throw new AppError('Broadcast request not found', 404);
+  }
+
+  if (bloodRequest.requestType !== 'broadcast') {
+    throw new AppError('Only broadcast requests can be closed', 400);
+  }
+
+  // Ensure only the creator can close it
+  if (!bloodRequest.requesterId._id.equals(req.user._id)) {
+    throw new AppError('Only the creator can resolve this request', 403);
+  }
+
+  if (bloodRequest.status === 'closed') {
+    throw new AppError('Request is already closed', 400);
+  }
+
+  bloodRequest.status = 'closed';
+  bloodRequest.resolvedAt = new Date();
+  bloodRequest.resolvedBy = req.user._id;
+
+  await bloodRequest.save();
+
+  const formatted = formatRequest(bloodRequest);
+
+  // Emit resolution event to sockets and create notifications
+  const creatorName = req.user.hospitalName || req.user.name;
+  await emitBroadcastResolved({
+    requestId: formatted._id,
+    resolverName: creatorName,
+    bloodGroup: formatted.bloodGroup,
+    city: formatted.city,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Emergency request resolved successfully',
     request: formatted,
   });
 });

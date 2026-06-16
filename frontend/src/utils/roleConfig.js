@@ -76,6 +76,7 @@ export const sidebarMenus = {
   admin: [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin-dashboard' },
     { label: 'Broadcast Feed', icon: Radio, path: '/blood-requests' },
+    { label: 'Manage Broadcasts', icon: ClipboardList, path: '/broadcasts' },
     { label: 'Users', icon: Users, path: '/users' },
     { label: 'Donors', icon: Droplets, path: '/donors' },
     { label: 'Hospitals', icon: Building2, path: '/hospitals' },

@@ -68,7 +68,7 @@ const bloodRequestSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['pending', 'accepted', 'rejected'],
+      enum: ['pending', 'accepted', 'rejected', 'active', 'closed'],
       default: 'pending',
     },
 
@@ -90,6 +90,49 @@ const bloodRequestSchema = new mongoose.Schema(
     hospitalName: {
       type: String,
       trim: true,
+    },
+
+    patientName: {
+      type: String,
+      trim: true,
+    },
+
+    unitsRequired: {
+      type: Number,
+      default: 1,
+    },
+
+    location: {
+      type: String,
+      trim: true,
+    },
+
+    requiredBefore: {
+      type: Date,
+    },
+
+    reason: {
+      type: String,
+      trim: true,
+    },
+
+    allowContact: {
+      type: Boolean,
+      default: true,
+    },
+
+    resolvedAt: {
+      type: Date,
+    },
+
+    resolvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
   },
   {

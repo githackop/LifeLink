@@ -57,6 +57,13 @@ const buildNotification = (type, data) => {
 };
 
 const getNotificationCopy = (notification) => {
+  if (notification.title && (notification.body || notification.message)) {
+    return {
+      title: notification.title,
+      body: notification.body || notification.message,
+    };
+  }
+
   switch (notification.type) {
     case 'new_request':
       return {
@@ -263,7 +270,13 @@ export const SocketProvider = ({ children }) => {
 
       const notification = buildNotification('request_response', data);
       if (pushNotification(notification)) {
-        showRequestResponse(data.status, data.donorName);
+        if (data.status === 'donor_added' || data.status === 'donor_updated') {
+          showSuccess(data.message || 'Donor directory updated');
+        } else if (data.status === 'hospital_responded') {
+          showSuccess(data.message || 'Hospital responded to your request');
+        } else {
+          showRequestResponse(data.status, data.donorName);
+        }
       }
     };
 
@@ -286,6 +299,29 @@ export const SocketProvider = ({ children }) => {
           `🚨 Emergency: ${data.bloodGroup} needed in ${data.city}`
         );
       }
+    };
+
+    const onBroadcastResolved = (data) => {
+      console.log('SOCKET EVENT RECEIVED:', 'broadcast_resolved', data);
+
+      notifyRequestListeners({ type: 'broadcast_resolved', ...data });
+
+      const role = userRef.current?.role;
+      if (role !== 'donor' && role !== 'hospital' && role !== 'admin') return;
+
+      const notification = buildNotification('broadcast_request', {
+        ...data,
+        title: 'Emergency Request Resolved',
+        message: `${data.resolverName} marked the ${data.bloodGroup} request in ${data.city} as resolved.`,
+      });
+      if (pushNotification(notification)) {
+        showSuccess(`✅ Resolved: ${data.bloodGroup} request in ${data.city}`);
+      }
+    };
+
+    const onBroadcastDeleted = (data) => {
+      console.log('SOCKET EVENT RECEIVED:', 'broadcast_deleted', data);
+      notifyRequestListeners({ type: 'broadcast_deleted', ...data });
     };
 
     const onAdminUpdate = (data) => {
@@ -317,6 +353,8 @@ export const SocketProvider = ({ children }) => {
     socket.on('disconnect', onDisconnect);
     socket.on('new_request', onNewRequest);
     socket.on('broadcast_request', onBroadcastRequest);
+    socket.on('broadcast_resolved', onBroadcastResolved);
+    socket.on('broadcast_deleted', onBroadcastDeleted);
     socket.on('request_response', onRequestResponse);
     socket.on('request_updated', onRequestUpdated);
     socket.on('admin_update', onAdminUpdate);
@@ -332,6 +370,8 @@ export const SocketProvider = ({ children }) => {
       socket.off('disconnect', onDisconnect);
       socket.off('new_request', onNewRequest);
       socket.off('broadcast_request', onBroadcastRequest);
+      socket.off('broadcast_resolved', onBroadcastResolved);
+      socket.off('broadcast_deleted', onBroadcastDeleted);
       socket.off('request_response', onRequestResponse);
       socket.off('request_updated', onRequestUpdated);
       socket.off('admin_update', onAdminUpdate);

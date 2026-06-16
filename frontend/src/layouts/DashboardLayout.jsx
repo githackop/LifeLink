@@ -7,6 +7,7 @@ import {
   LogOut,
   Menu,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/notifications/NotificationBell';
@@ -192,6 +193,19 @@ const DashboardLayout = () => {
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
+          {user?.role === 'hospital' && !user?.isVerified && (
+            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3 shadow-sm animate-pulse">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-900 text-sm">
+                  Your hospital account is awaiting admin approval.
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  Hospital features will be unlocked after verification.
+                </p>
+              </div>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>
