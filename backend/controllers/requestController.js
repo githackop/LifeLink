@@ -97,7 +97,17 @@ export const createRequest = asyncHandler(async (req, res) => {
     }
 
     const isHospital = req.user.role === 'hospital';
-    const emergency = isHospital ? true : Boolean(emergencyBody);
+    const {
+      patientName,
+      unitsRequired,
+      location,
+      requiredBefore,
+      reason,
+      allowContact,
+      city,
+      emergencyLevel
+    } = req.body;
+    const emergency = isHospital ? true : (emergencyLevel === 'urgent' || emergencyLevel === 'high' || Boolean(emergencyBody));
 
     const bloodRequest = await BloodRequest.create({
       requesterId: req.user._id,
@@ -107,6 +117,14 @@ export const createRequest = asyncHandler(async (req, res) => {
       emergency,
       hospitalName: isHospital ? req.user.hospitalName : undefined,
       requestType: 'direct',
+      patientName: patientName?.trim() || undefined,
+      unitsRequired: parseInt(unitsRequired) || 1,
+      city: city?.trim() || req.user.city || undefined,
+      location: location?.trim() || undefined,
+      requiredBefore: requiredBefore || undefined,
+      reason: reason || undefined,
+      allowContact: allowContact !== false,
+      emergencyLevel: emergencyLevel || (emergency ? 'urgent' : 'medium'),
     });
 
     const populated = await populateRequest(BloodRequest.findById(bloodRequest._id));

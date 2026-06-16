@@ -12,6 +12,7 @@ import {
 import { getErrorMessage } from '../services/api';
 import { showError, showSuccess } from '../utils/toast';
 import RequestCard from '../components/requests/RequestCard';
+import RequestDetailsModal from '../components/requests/RequestDetailsModal';
 import EmptyState from '../components/ui/EmptyState';
 import { SkeletonCardList } from '../components/ui/Skeleton';
 import Button from '../components/ui/Button';
@@ -25,6 +26,7 @@ const Requests = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [selectedRequestForDetails, setSelectedRequestForDetails] = useState(null);
 
   const fetchRequests = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -113,7 +115,7 @@ const Requests = () => {
   const EmptyIcon = isDonor ? Inbox : ClipboardList;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className={`space-y-6 mx-auto px-4 ${isDonor ? 'max-w-7xl' : 'max-w-4xl'}`}>
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -177,7 +179,7 @@ const Requests = () => {
           }
         />
       ) : (
-        <div className="space-y-4">
+        <div className={isDonor ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
           {requests.map((request, index) => (
             <RequestCard
               key={request._id}
@@ -187,11 +189,34 @@ const Requests = () => {
               onAccept={(id) => handleStatusUpdate(id, 'accepted')}
               onReject={(id) => handleStatusUpdate(id, 'rejected')}
               onComplete={handleComplete}
+              onViewDetails={(req) => setSelectedRequestForDetails(req)}
               actionLoadingId={actionLoadingId}
             />
           ))}
         </div>
       )}
+
+      <RequestDetailsModal
+        request={selectedRequestForDetails}
+        isOpen={!!selectedRequestForDetails}
+        onClose={() => setSelectedRequestForDetails(null)}
+        onAccept={(id) => {
+          handleStatusUpdate(id, 'accepted');
+          // Update details modal state if currently open
+          setSelectedRequestForDetails(prev => prev && prev._id === id ? { ...prev, status: 'accepted' } : prev);
+        }}
+        onReject={(id) => {
+          handleStatusUpdate(id, 'rejected');
+          // Update details modal state if currently open
+          setSelectedRequestForDetails(prev => prev && prev._id === id ? { ...prev, status: 'rejected' } : prev);
+        }}
+        onComplete={(id) => {
+          handleComplete(id);
+          // Update details modal state if currently open
+          setSelectedRequestForDetails(prev => prev && prev._id === id ? { ...prev, completed: true } : prev);
+        }}
+        loading={actionLoadingId === selectedRequestForDetails?._id}
+      />
     </div>
   );
 };
