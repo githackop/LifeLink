@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { getEmergencyRequests } from '../services/requestService';
 import { getErrorMessage } from '../services/api';
 import RequestCard from '../components/requests/RequestCard';
+import RequestDetailsModal from '../components/requests/RequestDetailsModal';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
 
@@ -15,6 +16,7 @@ const EmergencyRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedRequestForDetails, setSelectedRequestForDetails] = useState(null);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -35,7 +37,7 @@ const EmergencyRequests = () => {
   }, [fetchRequests]);
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto px-4">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -101,10 +103,22 @@ const EmergencyRequests = () => {
       ) : (
         <div className="space-y-4">
           {requests.map((request, index) => (
-            <RequestCard key={request._id} request={request} view="sent" index={index} />
+            <RequestCard
+              key={request._id}
+              request={request}
+              view="sent"
+              index={index}
+              onViewDetails={(req) => setSelectedRequestForDetails(req)}
+            />
           ))}
         </div>
       )}
+
+      <RequestDetailsModal
+        request={selectedRequestForDetails}
+        isOpen={!!selectedRequestForDetails}
+        onClose={() => setSelectedRequestForDetails(null)}
+      />
     </div>
   );
 };
