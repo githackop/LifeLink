@@ -15,6 +15,13 @@ import {
   Mail,
   UserCheck,
   Search,
+  CheckCircle,
+  FileText,
+  Clock,
+  Hash,
+  Eye,
+  User,
+  Building2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +31,7 @@ import {
   volunteerForRequest,
   createRequest,
   respondToBroadcastRequest,
+  closeBroadcastRequest,
 } from '../services/requestService';
 import { getErrorMessage } from '../services/api';
 import { showError, showSuccess } from '../utils/toast';
@@ -31,13 +39,23 @@ import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import { SkeletonCardList } from '../components/ui/Skeleton';
 import { BLOOD_GROUPS } from '../utils/bloodGroups';
+import BroadcastDetailsModal from '../components/requests/BroadcastDetailsModal';
+import ConfirmModal from '../components/common/ConfirmModal';
 
 const EMERGENCY_COLORS = {
   low: 'bg-blue-50 text-blue-700 border-blue-200',
   medium: 'bg-amber-50 text-amber-700 border-amber-200',
   high: 'bg-orange-50 text-orange-700 border-orange-200',
-  urgent: 'bg-rose-50 text-rose-700 border-rose-200',
+  urgent: 'bg-rose-50 text-rose-700 border-rose-200 border-l-4 border-l-rose-500 animate-pulse',
 };
+
+const REASONS = [
+  'Surgery',
+  'Accident',
+  'Cancer Treatment',
+  'Emergency Operation',
+  'Custom Message'
+];
 
 const BloodRequestsFeed = () => {
   const { user } = useAuth();
@@ -47,6 +65,15 @@ const BloodRequestsFeed = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Reusable confirmation modal states
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [broadcastToClose, setBroadcastToClose] = useState(null);
+  const [closeLoading, setCloseLoading] = useState(false);
+
+  // Details Modal State
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -63,6 +90,12 @@ const BloodRequestsFeed = () => {
     city: '',
     emergencyLevel: 'medium',
     message: '',
+    patientName: '',
+    unitsRequired: 1,
+    location: '',
+    requiredBefore: '',
+    reason: 'Custom Message',
+    allowContact: true,
   });
 
   const isDonor = user?.role === 'donor';
@@ -98,7 +131,6 @@ const BloodRequestsFeed = () => {
   useEffect(() => {
     const unsubscribe = subscribeToRequests((event) => {
       if (event.type === 'broadcast_request') {
-        // Fetch matching filters check
         const matchesBloodGroup = !filters.bloodGroup || event.bloodGroup === filters.bloodGroup;
         const matchesCity = !filters.city || event.city.toLowerCase().includes(filters.city.toLowerCase().trim());
         const matchesEmergency = !filters.emergencyLevel || event.emergencyLevel === filters.emergencyLevel;
@@ -115,18 +147,39 @@ const BloodRequestsFeed = () => {
               emergencyLevel: event.emergencyLevel,
               createdAt: event.createdAt,
               requestType: 'broadcast',
-              status: 'pending',
+              status: 'active',
               volunteers: [],
               requester: {
                 _id: event.requesterId,
                 name: event.requesterName,
-                role: 'user', // default role metadata
+                role: 'user',
               },
+              patientName: event.patientName,
+              unitsRequired: event.unitsRequired,
+              location: event.location,
+              requiredBefore: event.requiredBefore,
+              reason: event.reason,
+              allowContact: event.allowContact,
             };
 
             return [newBroadcastObj, ...prev];
           });
         }
+      } else if (event.type === 'broadcast_resolved') {
+        setRequests((prev) =>
+          prev.map((r) =>
+            r._id === event.requestId
+              ? {
+                  ...r,
+                  status: 'closed',
+                  resolvedAt: new Date().toISOString(),
+                  resolverName: event.resolverName,
+                }
+              : r
+          )
+        );
+      } else if (event.type === 'broadcast_deleted') {
+        setRequests((prev) => prev.filter((r) => r._id !== event.requestId));
       }
     });
 
@@ -139,7 +192,6 @@ const BloodRequestsFeed = () => {
     try {
       const { data } = await volunteerForRequest(id);
       showSuccess(data.message);
-      // update state locally
       setRequests((prev) =>
         prev.map((r) => (r._id === id ? data.request : r))
       );
@@ -163,6 +215,30 @@ const BloodRequestsFeed = () => {
     }
   };
 
+  // Close Broadcast Request
+  const handleCloseClick = (request) => {
+    setBroadcastToClose(request);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmClose = async () => {
+    if (!broadcastToClose) return;
+    setCloseLoading(true);
+    try {
+      const { data } = await closeBroadcastRequest(broadcastToClose._id);
+      showSuccess(data.message);
+      setConfirmOpen(false);
+      setBroadcastToClose(null);
+      setRequests((prev) =>
+        prev.map((r) => (r._id === data.request._id ? data.request : r))
+      );
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setCloseLoading(false);
+    }
+  };
+
   // Submit Broadcast Request modal
   const handleCreateBroadcast = async (e) => {
     e.preventDefault();
@@ -183,6 +259,12 @@ const BloodRequestsFeed = () => {
         city: newRequest.city.trim(),
         emergencyLevel: newRequest.emergencyLevel,
         message: newRequest.message,
+        patientName: newRequest.patientName.trim(),
+        unitsRequired: newRequest.unitsRequired,
+        location: newRequest.location.trim(),
+        requiredBefore: newRequest.requiredBefore,
+        reason: newRequest.reason,
+        allowContact: newRequest.allowContact,
         emergency: newRequest.emergencyLevel === 'urgent' || newRequest.emergencyLevel === 'high',
       });
 
@@ -193,6 +275,12 @@ const BloodRequestsFeed = () => {
         city: '',
         emergencyLevel: 'medium',
         message: '',
+        patientName: '',
+        unitsRequired: 1,
+        location: '',
+        requiredBefore: '',
+        reason: 'Custom Message',
+        allowContact: true,
       });
       fetchRequests();
     } catch (err) {
@@ -210,6 +298,20 @@ const BloodRequestsFeed = () => {
     });
   };
 
+  const getPostedTime = (dateString) => {
+    if (!dateString) return '';
+    const diffMs = new Date() - new Date(dateString);
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays} days ago`;
+  };
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* HEADER */}
@@ -217,7 +319,7 @@ const BloodRequestsFeed = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2.5">
-              <Radio className="w-7 h-7 text-rose-500 animate-pulse" />
+              <Radio className="w-7 h-7 text-rose-600 animate-pulse" />
               Emergency Broadcast Feed
             </h1>
             {connected && (
@@ -239,7 +341,7 @@ const BloodRequestsFeed = () => {
             }}
             disabled={user?.role === 'hospital' && !user?.isVerified}
             title={user?.role === 'hospital' && !user?.isVerified ? "Available after admin verification" : ""}
-            className="self-start sm:self-center flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white shadow-lg shadow-rose-500/25 border-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="self-start sm:self-center flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white shadow-lg shadow-rose-500/25 border-none disabled:opacity-50"
           >
             <Plus className="w-5 h-5" />
             Broadcast Request
@@ -265,7 +367,6 @@ const BloodRequestsFeed = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Blood group filter */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Blood Group</label>
             <div className="relative">
@@ -285,7 +386,6 @@ const BloodRequestsFeed = () => {
             </div>
           </div>
 
-          {/* City filter */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">City</label>
             <div className="relative">
@@ -300,7 +400,6 @@ const BloodRequestsFeed = () => {
             </div>
           </div>
 
-          {/* Emergency Level Filter */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Emergency Level</label>
             <div className="relative">
@@ -314,7 +413,7 @@ const BloodRequestsFeed = () => {
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                <option value="urgent">Urgent / Critical</option>
               </select>
             </div>
           </div>
@@ -334,17 +433,18 @@ const BloodRequestsFeed = () => {
       ) : requests.length === 0 ? (
         <EmptyState
           icon={Radio}
-          title="No broadcast requests yet"
+          title="No active broadcast requests yet"
           description="Try modifying your filters or post a new request to notify the community."
         />
       ) : (
-        <div className="grid grid-cols-1 gap-5">
+        <div className="grid grid-cols-1 gap-6">
           {requests.map((request, index) => {
             const hasVolunteered = request.volunteers?.some(
               (v) => v.donorId === user?._id || v.donorId?._id === user?._id
             );
             const isRequester =
               request.requester?._id === user?._id || request.requester === user?._id;
+            const isClosed = request.status === 'closed';
 
             return (
               <motion.article
@@ -352,168 +452,199 @@ const BloodRequestsFeed = () => {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="rounded-2xl border border-white/60 bg-white/75 backdrop-blur-xl p-5 shadow-soft border-l-4 border-l-rose-500 relative overflow-hidden"
+                className={`rounded-3xl border border-white/60 bg-white/75 backdrop-blur-xl p-6 shadow-soft transition-all duration-300 relative overflow-hidden flex flex-col gap-4 border-l-4 ${
+                  isClosed
+                    ? 'border-l-emerald-500 bg-slate-50/50'
+                    : request.emergencyLevel === 'urgent'
+                    ? 'border-l-red-600 bg-rose-50/15'
+                    : 'border-l-rose-500'
+                }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                {/* Top header row */}
+                <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100/60">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center text-white text-lg font-bold shadow-md shadow-rose-500/20">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center text-white text-lg font-bold shadow-md shadow-rose-500/20">
                       {request.bloodGroup}
                     </div>
-
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-bold text-slate-900 text-base">
-                          {request.hospitalName || request.requester?.hospitalName || request.requester?.name || 'Anonymous'}
+                        <h3 className="font-extrabold text-slate-900 text-base">
+                          {request.patientName ? `${request.patientName} needs blood` : 'Emergency blood required'}
                         </h3>
+                        {isClosed ? (
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-emerald-100 text-emerald-800 uppercase border border-emerald-200">
+                            Resolved
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-rose-100 text-rose-800 uppercase border border-rose-200">
+                            Active
+                          </span>
+                        )}
                         {isRequester && (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 uppercase">
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 uppercase border">
                             Your Request
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                        {request.city}
+                      <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        Posted {getPostedTime(request.createdAt)}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold uppercase tracking-wider border ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                         EMERGENCY_COLORS[request.emergencyLevel] ||
                         EMERGENCY_COLORS.medium
                       }`}
                     >
-                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <AlertTriangle className="w-3 h-3" />
                       {request.emergencyLevel}
                     </span>
 
-                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {new Date(request.createdAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-semibold">
+                      <Hash className="w-3 h-3" />
+                      {request.unitsRequired || 1} Unit(s)
                     </span>
                   </div>
                 </div>
 
-                {/* MESSAGE */}
-                {request.message && (
-                  <p className="mt-4 text-sm text-slate-600 bg-slate-50/70 rounded-xl p-3 border border-slate-100">
-                    {request.message}
-                  </p>
-                )}
-
-                {/* DYNAMIC VIEW FOR VOLUNTEERS OR CONTACTS */}
-                {/* 1. DONOR CAN VOLUNTEER */}
-                {isDonor && (
-                  <div className="mt-5 flex items-center gap-3">
-                    {hasVolunteered ? (
-                      <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 font-semibold text-sm rounded-xl border border-emerald-200">
-                        <UserCheck className="w-4 h-4" />
-                        You volunteered!
-                      </span>
-                    ) : (
-                      <Button
-                        onClick={() => handleVolunteer(request._id)}
-                        loading={actionLoadingId === request._id}
-                        className="bg-brand-600 hover:bg-brand-500 text-white font-medium shadow-md flex items-center gap-2"
-                      >
-                        <Droplets className="w-4 h-4" />
-                        I Can Donate
-                      </Button>
-                    )}
+                {/* Patient/Location stats grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50/60 rounded-2xl p-4 text-xs border border-slate-100/50">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-slate-400 font-medium uppercase tracking-wider text-[9px]">Hospital Facility</span>
+                    <span className="text-slate-700 font-bold">
+                      {request.hospitalName || request.requester?.hospitalName || 'Not specified'}
+                    </span>
                   </div>
-                )}
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-slate-400 font-medium uppercase tracking-wider text-[9px]">Location Address</span>
+                    <span className="text-slate-700 font-semibold flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-rose-500" />
+                      {request.location || request.city}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-slate-400 font-medium uppercase tracking-wider text-[9px]">Required Before</span>
+                    <span className="text-rose-600 font-bold flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {request.requiredBefore ? new Date(request.requiredBefore).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                </div>
 
-                {/* 2. REQUESTER VIEW (INTERESTED DONORS LIST) */}
-                {isRequester && (
-                  <div className="mt-5 pt-4 border-t border-slate-100">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <Users className="w-4 h-4 text-rose-500" />
-                      Interested Donors ({request.volunteers?.length || 0})
-                    </h4>
-                    {request.volunteers?.length === 0 ? (
-                      <p className="text-xs text-slate-400">No donors have volunteered yet. Sockets are listening...</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                        {request.volunteers.map((vol) => (
-                          <div
-                            key={vol.donorId}
-                            className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 flex flex-col gap-1 text-xs"
-                          >
-                            <span className="font-semibold text-slate-800">{vol.name}</span>
-                            <span className="text-slate-500 flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-slate-400" />
-                              {vol.phoneNumber || 'N/A'}
-                            </span>
-                            <span className="text-slate-500 flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-slate-400" />
-                              {vol.email || 'N/A'}
-                            </span>
-                          </div>
-                        ))}
+                {/* Reason & custom message */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-slate-400">Reason:</span>
+                    <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold">
+                      {request.reason || 'Custom Message'}
+                    </span>
+                  </div>
+                  {request.message && (
+                    <p className="text-slate-600 bg-white/50 border border-slate-100/80 rounded-xl p-3 leading-relaxed">
+                      {request.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Contact and action triggers */}
+                <div className="mt-2 pt-4 border-t border-slate-100/60 flex flex-wrap items-center justify-between gap-3">
+                  
+                  {/* Creator Info */}
+                  <div className="text-xs text-slate-500 flex flex-col gap-0.5">
+                    <span>Posted by <span className="font-semibold text-slate-700">{request.requester?.name || 'Someone'}</span></span>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wide">{request.requester?.role || 'Hospital'}</span>
+                  </div>
+
+                  {/* Actions wrapper */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* View Details Modal button */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDetails(request)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors border border-slate-200/50"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View Details
+                    </button>
+
+                    {isClosed ? (
+                      /* Resolved status notification display */
+                      <div className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-bold text-xs">
+                        <CheckCircle className="w-4 h-4" />
+                        This request has been resolved
                       </div>
+                    ) : (
+                      <>
+                        {/* 1. Direct Donor volunteering */}
+                        {isDonor && (
+                          <>
+                            {hasVolunteered ? (
+                              <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200">
+                                <UserCheck className="w-4 h-4" />
+                                Volunteered
+                              </span>
+                            ) : (
+                              <Button
+                                onClick={() => handleVolunteer(request._id)}
+                                loading={actionLoadingId === request._id}
+                                className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl py-2 px-4 shadow-md shadow-rose-500/10 flex items-center gap-2 border-none"
+                              >
+                                <Droplets className="w-4 h-4" />
+                                I Can Donate
+                              </Button>
+                            )}
+                          </>
+                        )}
+
+                        {/* 2. Hospital response */}
+                        {isHospital && (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              onClick={() => {
+                                if (user?.role === 'hospital' && !user?.isVerified) return;
+                                handleHospitalRespond(request._id);
+                              }}
+                              disabled={user?.role === 'hospital' && !user?.isVerified}
+                              title={user?.role === 'hospital' && !user?.isVerified ? "Available after admin verification" : ""}
+                              loading={actionLoadingId === request._id}
+                              className="text-xs font-bold py-2 px-4 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 disabled:opacity-50"
+                            >
+                              Respond to Request
+                            </Button>
+                            {user?.role === 'hospital' && !user?.isVerified ? (
+                              <span className="inline-flex items-center gap-1 text-slate-400 cursor-not-allowed font-semibold text-xs" title="Available after admin verification">
+                                <Search className="w-4 h-4" /> Search Directory
+                              </span>
+                            ) : (
+                              <Link to="/hospital-donors" className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-500 font-bold text-xs transition-colors">
+                                <Search className="w-4 h-4" /> Search Directory
+                              </Link>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 3. Creator close options */}
+                        {isRequester && (
+                          <button
+                            type="button"
+                            onClick={() => handleCloseClick(request)}
+                            disabled={closeLoading}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors shadow-md shadow-emerald-600/10 border-none"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Close Request
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
-                )}
 
-                {/* 3. HOSPITAL INTEGRATION */}
-                {isHospital && (
-                  <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
-                    <div className="flex flex-wrap gap-3 text-slate-500">
-                      {request.requester?.phoneNumber && (
-                        <span className="inline-flex items-center gap-1">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          {request.requester.phoneNumber}
-                        </span>
-                      )}
-                      {request.requester?.email && (
-                        <span className="inline-flex items-center gap-1">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
-                          {request.requester.email}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="secondary"
-                        onClick={() => {
-                          if (user?.role === 'hospital' && !user?.isVerified) return;
-                          handleHospitalRespond(request._id);
-                        }}
-                        disabled={user?.role === 'hospital' && !user?.isVerified}
-                        title={user?.role === 'hospital' && !user?.isVerified ? "Available after admin verification" : ""}
-                        loading={actionLoadingId === request._id}
-                        className="text-xs font-semibold py-1.5 px-3 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Respond to Request
-                      </Button>
-                      {user?.role === 'hospital' && !user?.isVerified ? (
-                        <span
-                          className="inline-flex items-center gap-1 text-slate-400 cursor-not-allowed font-semibold"
-                          title="Available after admin verification"
-                        >
-                          <Search className="w-4 h-4" />
-                          Search Directory
-                        </span>
-                      ) : (
-                        <Link
-                          to={`/hospital-donors`}
-                          className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-500 font-semibold transition-colors"
-                        >
-                          <Search className="w-4 h-4" />
-                          Search Directory
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                )}
+                </div>
               </motion.article>
             );
           })}
@@ -523,12 +654,12 @@ const BloodRequestsFeed = () => {
       {/* CREATE BROADCAST REQUEST MODAL */}
       <AnimatePresence>
         {modalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm pointer-events-auto"
               onClick={() => setModalOpen(false)}
             />
 
@@ -536,87 +667,191 @@ const BloodRequestsFeed = () => {
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl overflow-hidden border border-slate-100"
+              className="relative pointer-events-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl overflow-y-auto max-h-[90vh] border border-slate-100"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
                   <Radio className="w-5 h-5 text-rose-500 animate-pulse" />
-                  Create Broadcast Request
+                  Create Emergency Broadcast
                 </h2>
                 <button
                   onClick={() => setModalOpen(false)}
-                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateBroadcast} className="space-y-4">
-                {/* Blood Group */}
+              <form onSubmit={handleCreateBroadcast} className="space-y-4 text-xs font-semibold">
+                
+                {/* Patient Name */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Blood Group Required</label>
+                  <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Patient Name</label>
                   <div className="relative">
-                    <Droplets className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <select
-                      value={newRequest.bloodGroup}
-                      onChange={(e) => setNewRequest((n) => ({ ...n, bloodGroup: e.target.value }))}
-                      required
-                      className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
-                    >
-                      <option value="">Select blood group</option>
-                      {BLOOD_GROUPS.map((bg) => (
-                        <option key={bg} value={bg}>
-                          {bg}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* City */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">City / Location</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="e.g. Vijayawada"
-                      value={newRequest.city}
-                      onChange={(e) => setNewRequest((n) => ({ ...n, city: e.target.value }))}
+                      placeholder="e.g. Rahul Kumar"
+                      value={newRequest.patientName}
+                      onChange={(e) => setNewRequest((n) => ({ ...n, patientName: e.target.value }))}
                       required
                       className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
                     />
                   </div>
                 </div>
 
-                {/* Emergency Level */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Blood Group */}
+                  <div>
+                    <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Blood Group Required</label>
+                    <div className="relative">
+                      <Droplets className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <select
+                        value={newRequest.bloodGroup}
+                        onChange={(e) => setNewRequest((n) => ({ ...n, bloodGroup: e.target.value }))}
+                        required
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
+                      >
+                        <option value="">Select</option>
+                        {BLOOD_GROUPS.map((bg) => (
+                          <option key={bg} value={bg}>
+                            {bg}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Units required */}
+                  <div>
+                    <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Units Needed</label>
+                    <div className="relative">
+                      <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={newRequest.unitsRequired}
+                        onChange={(e) => setNewRequest((n) => ({ ...n, unitsRequired: parseInt(e.target.value) || 1 }))}
+                        required
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* City */}
+                  <div>
+                    <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">City</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="e.g. Vijayawada"
+                        value={newRequest.city}
+                        onChange={(e) => setNewRequest((n) => ({ ...n, city: e.target.value }))}
+                        required
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Detailed location */}
+                  <div>
+                    <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Hospital Location</label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="e.g. Apollo Hospitals"
+                        value={newRequest.location}
+                        onChange={(e) => setNewRequest((n) => ({ ...n, location: e.target.value }))}
+                        required
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Required Before */}
+                  <div>
+                    <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Required Before Date</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="datetime-local"
+                        value={newRequest.requiredBefore}
+                        onChange={(e) => setNewRequest((n) => ({ ...n, requiredBefore: e.target.value }))}
+                        required
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Emergency Level */}
+                  <div>
+                    <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Urgency Level</label>
+                    <div className="relative">
+                      <AlertTriangle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <select
+                        value={newRequest.emergencyLevel}
+                        onChange={(e) => setNewRequest((n) => ({ ...n, emergencyLevel: e.target.value }))}
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent / Critical</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Primary Reason */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Emergency Level</label>
+                  <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Medical Case / Reason</label>
                   <div className="relative">
-                    <AlertTriangle className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <FileText className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <select
-                      value={newRequest.emergencyLevel}
-                      onChange={(e) => setNewRequest((n) => ({ ...n, emergencyLevel: e.target.value }))}
+                      value={newRequest.reason}
+                      onChange={(e) => setNewRequest((n) => ({ ...n, reason: e.target.value }))}
                       className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
                     >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
+                      {REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
 
                 {/* Message */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Message / Details</label>
+                  <label className="block text-slate-500 mb-1.5 uppercase tracking-wide text-[9px]">Details / Special Instructions</label>
                   <textarea
-                    placeholder="Provide details about hospital name, contact person, or urgent timing..."
+                    placeholder="Provide patient state, contact times, room number or additional remarks..."
                     value={newRequest.message}
                     onChange={(e) => setNewRequest((n) => ({ ...n, message: e.target.value }))}
-                    rows={3}
+                    rows={2}
                     className="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
                   />
+                </div>
+
+                {/* Allow contact checkbox */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="allowContact"
+                    checked={newRequest.allowContact}
+                    onChange={(e) => setNewRequest((n) => ({ ...n, allowContact: e.target.checked }))}
+                    className="rounded text-brand-600 focus:ring-brand-500"
+                  />
+                  <label htmlFor="allowContact" className="text-slate-600 text-xs font-semibold">
+                    Display direct phone and email contact info to responders
+                  </label>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
@@ -633,6 +868,31 @@ const BloodRequestsFeed = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* DETAILS VIEW MODAL */}
+      <BroadcastDetailsModal
+        request={selectedRequest}
+        open={detailsOpen}
+        onClose={() => {
+          setDetailsOpen(false);
+          setSelectedRequest(null);
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Mark Request Resolved"
+        description={`Are you sure you want to mark this request${broadcastToClose?.patientName ? ` for ${broadcastToClose.patientName}` : ''} as resolved and close it?`}
+        confirmText="Yes, Resolve"
+        cancelText="Cancel"
+        onConfirm={handleConfirmClose}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setBroadcastToClose(null);
+        }}
+        loading={closeLoading}
+        isDanger={false}
+      />
     </div>
   );
 };

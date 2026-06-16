@@ -10,6 +10,7 @@ import {
   getHospitals,
   toggleHospitalVerify,
   toggleHospitalBlock,
+  deleteBroadcast,
 } from '../controllers/adminController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
@@ -29,5 +30,6 @@ router.delete('/donors/:id', deleteDonor);
 router.get('/hospitals', getHospitals);
 router.patch('/hospitals/:id/verify', toggleHospitalVerify);
 router.patch('/hospitals/:id/block', toggleHospitalBlock);
+router.delete('/broadcasts/:id', deleteBroadcast);
 
 export default router;

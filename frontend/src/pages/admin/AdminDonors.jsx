@@ -8,6 +8,7 @@ import { BLOOD_GROUPS } from '../../utils/bloodGroups';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import AdminUserDetailsModal from '../../components/admin/AdminUserDetailsModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 const AdminDonors = () => {
   const [donors, setDonors] = useState([]);
@@ -18,9 +19,35 @@ const AdminDonors = () => {
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
 
+  // Reusable confirmation modal states
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [donorToDelete, setDonorToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const handleViewDetails = (donor) => {
     setSelectedUserId(donor._id);
     setDetailsModalOpen(true);
+  };
+
+  const handleDeleteClick = (donor) => {
+    setDonorToDelete(donor);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!donorToDelete) return;
+    setDeleteLoading(true);
+    try {
+      const { data } = await deleteAdminDonor(donorToDelete._id);
+      showSuccess(data.message);
+      setConfirmOpen(false);
+      setDonorToDelete(null);
+      fetchDonors();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const fetchDonors = useCallback(async () => {
@@ -43,20 +70,6 @@ const AdminDonors = () => {
     const timer = setTimeout(fetchDonors, 300);
     return () => clearTimeout(timer);
   }, [fetchDonors]);
-
-  const handleDelete = async (donor) => {
-    if (!window.confirm(`Delete donor ${donor.name}? This cannot be undone.`)) return;
-    setActionId(donor._id);
-    try {
-      const { data } = await deleteAdminDonor(donor._id);
-      showSuccess(data.message);
-      fetchDonors();
-    } catch (err) {
-      showError(getErrorMessage(err));
-    } finally {
-      setActionId(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -175,7 +188,7 @@ const AdminDonors = () => {
                           <button
                             type="button"
                             disabled={actionId === d._id}
-                            onClick={() => handleDelete(d)}
+                            onClick={() => handleDeleteClick(d)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -199,6 +212,21 @@ const AdminDonors = () => {
           setDetailsModalOpen(false);
           setSelectedUserId(null);
         }}
+      />
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Delete Donor Profile"
+        description={`Are you sure you want to delete donor ${donorToDelete?.name}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setDonorToDelete(null);
+        }}
+        loading={deleteLoading}
+        isDanger={true}
       />
     </div>
   );

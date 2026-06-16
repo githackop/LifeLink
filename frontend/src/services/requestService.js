@@ -26,3 +26,6 @@ export const volunteerForRequest = (id) =>
 
 export const respondToBroadcastRequest = (id) =>
   api.post(`/requests/${id}/hospital-respond`);
+
+export const closeBroadcastRequest = (id) =>
+  api.patch(`/broadcasts/${id}/close`);

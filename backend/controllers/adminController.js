@@ -4,7 +4,7 @@ import BloodRequest from '../models/BloodRequest.js';
 import HospitalDonor from '../models/HospitalDonor.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
-import { emitAdminUpdate, emitAccountUpdate, emitToUser } from '../sockets/socketManager.js';
+import { emitAdminUpdate, emitAccountUpdate, emitToUser, emitBroadcastDeleted } from '../sockets/socketManager.js';
 import Notification from '../models/Notification.js';
 
 const requesterFields = 'name email role hospitalName';
@@ -58,6 +58,8 @@ export const getStats = asyncHandler(async (req, res) => {
     recentRequests,
     totalBroadcastRequests,
     activeBroadcastRequests,
+    resolvedBroadcastRequests,
+    deletedBroadcastRequests,
     volunteersRes,
     broadcastDemandStats,
   ] = await Promise.all([
@@ -76,23 +78,26 @@ export const getStats = asyncHandler(async (req, res) => {
     ]),
     User.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }, { $sort: { _id: 1 } }]),
     BloodRequest.aggregate([
+      { $match: { isDeleted: { $ne: true } } },
       { $group: { _id: '$status', count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
-    BloodRequest.find()
+    BloodRequest.find({ isDeleted: { $ne: true } })
       .sort({ createdAt: -1 })
       .limit(8)
       .populate('requesterId', requesterFields)
       .populate('donorId', donorFields),
-    BloodRequest.countDocuments({ requestType: 'broadcast' }),
-    BloodRequest.countDocuments({ requestType: 'broadcast', status: 'pending' }),
+    BloodRequest.countDocuments({ requestType: 'broadcast', isDeleted: { $ne: true } }),
+    BloodRequest.countDocuments({ requestType: 'broadcast', status: { $in: ['active', 'pending'] }, isDeleted: { $ne: true } }),
+    BloodRequest.countDocuments({ requestType: 'broadcast', status: 'closed', isDeleted: { $ne: true } }),
+    BloodRequest.countDocuments({ requestType: 'broadcast', isDeleted: true }),
     BloodRequest.aggregate([
-      { $match: { requestType: 'broadcast' } },
+      { $match: { requestType: 'broadcast', isDeleted: { $ne: true } } },
       { $project: { volunteersCount: { $size: { $ifNull: ['$volunteers', []] } } } },
       { $group: { _id: null, total: { $sum: '$volunteersCount' } } }
     ]),
     BloodRequest.aggregate([
-      { $match: { requestType: 'broadcast' } },
+      { $match: { requestType: 'broadcast', isDeleted: { $ne: true } } },
       { $group: { _id: '$bloodGroup', count: { $sum: 1 } } }
     ])
   ]);
@@ -117,6 +122,8 @@ export const getStats = asyncHandler(async (req, res) => {
         totalRequests: requestStatusBreakdown.reduce((sum, r) => sum + r.count, 0),
         totalBroadcastRequests,
         activeBroadcastRequests,
+        resolvedBroadcastRequests,
+        deletedBroadcastRequests,
         totalVolunteers,
         bloodGroupDemand,
       },
@@ -523,5 +530,30 @@ export const getUserDetails = asyncHandler(async (req, res) => {
     user: formatAdminUser(user),
     activity,
     roleSpecificData,
+  });
+});
+
+export const deleteBroadcast = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateObjectId(id);
+
+  const bloodRequest = await BloodRequest.findById(id);
+  if (!bloodRequest) {
+    throw new AppError('Broadcast request not found', 404);
+  }
+
+  if (bloodRequest.requestType !== 'broadcast') {
+    throw new AppError('Only broadcast requests can be deleted', 400);
+  }
+
+  bloodRequest.isDeleted = true;
+  await bloodRequest.save();
+
+  // Notify clients through sockets
+  emitBroadcastDeleted({ requestId: id });
+
+  res.status(200).json({
+    success: true,
+    message: 'Broadcast request deleted successfully',
   });
 });

@@ -515,3 +515,63 @@ export const emitAccountUpdate = (userId, payload) => {
     createdAt: payload.createdAt || new Date().toISOString(),
   });
 };
+
+export const emitBroadcastResolved = async (payload) => {
+  try {
+    const resolverName = payload.resolverName || 'Someone';
+    const bloodGroup = payload.bloodGroup || '';
+    const city = payload.city || '';
+    const title = 'Emergency Request Resolved';
+    const message = `${resolverName} marked the ${bloodGroup} emergency request in ${city} as resolved.`;
+
+    const metadata = {
+      resolverName,
+      city,
+      bloodGroup,
+      requestId: payload.requestId?.toString(),
+    };
+
+    // Save to DB for all donors, hospitals, and admins
+    const recipients = await User.find({ role: { $in: ['donor', 'hospital', 'admin'] } });
+
+    const notificationPromises = recipients.map((recipient) =>
+      Notification.create({
+        recipientId: recipient._id,
+        type: 'broadcast_request',
+        title,
+        message,
+        metadata,
+      })
+    );
+
+    const notifications = await Promise.all(notificationPromises);
+    const sampleNotification = notifications[0];
+
+    const body = {
+      _id: sampleNotification?._id?.toString() || new Date().getTime().toString(),
+      type: 'broadcast_request',
+      read: false,
+      title,
+      message,
+      createdAt: sampleNotification?.createdAt?.toISOString() || new Date().toISOString(),
+      metadata,
+      requestId: payload.requestId?.toString(),
+      status: 'closed',
+    };
+
+    emitToRoom('role:donor', 'broadcast_resolved', body);
+    emitToRoom('role:hospital', 'broadcast_resolved', body);
+    emitToRoom('role:admin', 'broadcast_resolved', body);
+  } catch (err) {
+    console.error('Error in emitBroadcastResolved:', err);
+  }
+};
+
+export const emitBroadcastDeleted = (payload) => {
+  const body = {
+    requestId: payload.requestId?.toString(),
+  };
+  emitToRoom('role:donor', 'broadcast_deleted', body);
+  emitToRoom('role:hospital', 'broadcast_deleted', body);
+  emitToRoom('role:admin', 'broadcast_deleted', body);
+};

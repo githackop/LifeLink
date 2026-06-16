@@ -22,3 +22,5 @@ export const toggleHospitalBlock = (id, blocked) =>
   api.patch(`/admin/hospitals/${id}/block`, typeof blocked === 'boolean' ? { blocked } : {});
 
 export const getAdminUserDetails = (id) => api.get(`/admin/users/${id}`);
+
+export const deleteAdminBroadcast = (id) => api.delete(`/admin/broadcasts/${id}`);

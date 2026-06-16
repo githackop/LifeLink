@@ -25,6 +25,7 @@ import AdminDashboard from '../pages/admin/AdminDashboard';
 import AdminUsers from '../pages/admin/AdminUsers';
 import AdminDonors from '../pages/admin/AdminDonors';
 import AdminHospitals from '../pages/admin/AdminHospitals';
+import AdminBroadcasts from '../pages/admin/AdminBroadcasts';
 import BloodRequestsFeed from '../pages/BloodRequestsFeed';
 
 const AppRoutes = () => (
@@ -148,6 +149,15 @@ const AppRoutes = () => (
               element={
                 <RoleRoute roles={['admin']}>
                   <AdminHospitals />
+                </RoleRoute>
+              }
+            />
+
+            <Route
+              path="broadcasts"
+              element={
+                <RoleRoute roles={['admin']}>
+                  <AdminBroadcasts />
                 </RoleRoute>
               }
             />
