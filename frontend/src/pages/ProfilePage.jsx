@@ -30,6 +30,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { roleLabels } from '../utils/roleConfig';
 import * as profileService from '../services/profileService';
+import { updateAvailability } from '../services/donorService';
+import { getErrorMessage } from '../services/api';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
@@ -322,6 +324,22 @@ const ProfilePage = () => {
 
   const [activeTab, setActiveTab] = useState('personal'); // Tab states: 'personal', 'security', 'settings'
   const [editLoading, setEditLoading] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState(false);
+
+  const handleAvailabilityToggle = async () => {
+    setToggleLoading(true);
+    try {
+      const nextValue = !user?.availability;
+      const { data: res } = await updateAvailability(nextValue);
+      updateUser(res.user);
+      setAvailability(res.user.availability !== false);
+      toast.success(res.message || 'Availability updated successfully');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setToggleLoading(false);
+    }
+  };
 
   // Edit details form states
   const [name, setName] = useState(user?.name || '');
@@ -367,7 +385,6 @@ const ProfilePage = () => {
 
       if (isDonor) {
         payload.bloodGroup = bloodGroup;
-        payload.availability = availability;
       }
       if (isHospital) {
         payload.hospitalName = hospitalName;
@@ -445,52 +462,64 @@ const ProfilePage = () => {
           {user?.name?.charAt(0)?.toUpperCase() || <User className="w-8 h-8" />}
         </div>
 
-        <div className="flex-1 text-center md:text-left space-y-3">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-950 flex items-center justify-center md:justify-start gap-2 flex-wrap">
-              {user?.name}
-              {((isHospital ? user?.isHospitalVerified : user?.isVerified)) && (
-                <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-100 flex-shrink-0" />
-              )}
-            </h2>
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-1">
-              <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${badge.color}`}>
-                {badge.label}
-              </span>
-              {user?.city && (
-                <span className="inline-flex items-center gap-0.5 text-xs text-slate-500 font-medium">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  {user.city}
+        <div className="flex-1 text-center md:text-left space-y-3 w-full">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-955 flex items-center justify-center md:justify-start gap-2 flex-wrap">
+                {user?.name}
+                {((isHospital ? user?.isHospitalVerified : user?.isVerified)) && (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-100 flex-shrink-0" />
+                )}
+              </h2>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-1">
+                <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${badge.color}`}>
+                  {badge.label}
                 </span>
-              )}
+                {user?.city && (
+                  <span className="inline-flex items-center gap-0.5 text-xs text-slate-500 font-medium">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    {user.city}
+                  </span>
+                )}
+                {isDonor && user?.bloodGroup && (
+                  <span className="inline-flex items-center gap-1.5 text-xs bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-lg border border-rose-100 font-bold">
+                    <Droplets className="w-3.5 h-3.5 text-rose-600 fill-rose-100" />
+                    {user.bloodGroup}
+                  </span>
+                )}
+              </div>
             </div>
+
+            {isDonor && (
+              <div className="self-center md:self-start">
+                {user?.availability ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Available
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200">
+                    <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    Unavailable
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-2 pt-2 border-t border-slate-100 text-xs text-slate-500 font-medium">
-            <span className="flex items-center gap-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-2 gap-x-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-medium">
+            <span className="flex items-center justify-center md:justify-start gap-1.5">
+              <Mail className="w-4 h-4 text-slate-400" />
+              {user?.email}
+            </span>
+            <span className="flex items-center justify-center md:justify-start gap-1.5">
+              <Phone className="w-4 h-4 text-slate-400" />
+              {user?.phoneNumber}
+            </span>
+            <span className="flex items-center justify-center md:justify-start gap-1.5">
               <Calendar className="w-4 h-4 text-slate-400" />
               Member Since {new Date(user?.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })}
             </span>
-
-            {isDonor && (
-              <span className="flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-slate-400" />
-                Availability Status: 
-                <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${availability ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
-                  {availability ? 'Available' : 'Unavailable'}
-                </span>
-              </span>
-            )}
-
-            {isHospital && (
-              <span className="flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-slate-400" />
-                Facility Status:
-                <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${user?.isHospitalVerified ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100 animate-pulse'}`}>
-                  {user?.isHospitalVerified ? 'Approved' : 'Pending Verification'}
-                </span>
-              </span>
-            )}
           </div>
         </div>
       </div>
@@ -533,13 +562,68 @@ const ProfilePage = () => {
       <div className="mt-4">
         <AnimatePresence mode="wait">
           {activeTab === 'personal' && (
-            <motion.div
-              key="personal"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft space-y-6"
-            >
+            <div className="space-y-6">
+              {isDonor && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft"
+                >
+                  <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-lg">Donation Availability</h3>
+                      <p className="text-slate-400 text-xs mt-0.5">Control whether you are listed as an active blood donor.</p>
+                    </div>
+                    <div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${user?.availability ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                        {user?.availability ? 'Available' : 'Unavailable'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-5">
+                    <div>
+                      <span className="text-sm text-slate-700 font-semibold">Available for Donation</span>
+                      <span className="text-xs text-slate-400 block mt-0.5">
+                        {user?.availability 
+                          ? 'Hospitals and users can see you as available for emergency contact.' 
+                          : 'You are hidden from availability searches and requests.'}
+                      </span>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      disabled={toggleLoading}
+                      onClick={handleAvailabilityToggle}
+                      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60 flex-shrink-0
+                        ${user?.availability ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-slate-300'}`}
+                      aria-pressed={user?.availability}
+                      aria-label="Toggle availability"
+                    >
+                      {toggleLoading ? (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <div className={`w-3.5 h-3.5 border-2 rounded-full animate-spin border-t-transparent ${user?.availability ? 'border-white' : 'border-slate-500'}`} />
+                        </span>
+                      ) : (
+                        <motion.span
+                          layout
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          className={`absolute flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm
+                            ${user?.availability ? 'left-[calc(100%-1.375rem)]' : 'left-1'}`}
+                        />
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              <motion.div
+                key="personal"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft space-y-6"
+              >
               <div className="border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-slate-900 text-lg">Personal Information</h3>
                 <p className="text-slate-400 text-xs mt-0.5">Edit details associated with your public account.</p>
@@ -623,33 +707,17 @@ const ProfilePage = () => {
 
                   {/* Donor Specific Fields */}
                   {isDonor && (
-                    <>
-                      <div>
-                        <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Blood Group</label>
-                        <Select
-                          value={bloodGroup}
-                          onChange={(e) => setBloodGroup(e.target.value)}
-                        >
-                          {BLOOD_GROUPS.map((bg) => (
-                            <option key={bg} value={bg}>{bg}</option>
-                          ))}
-                        </Select>
-                      </div>
-
-                      {/* Availability Switch */}
-                      <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-800">Availability Status</label>
-                          <span className="text-[10px] text-slate-400 block mt-0.5">Let requesters know you are available.</span>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={availability}
-                          onChange={(e) => setAvailability(e.target.checked)}
-                          className="w-5 h-5 rounded accent-emerald-600 focus:ring-emerald-500"
-                        />
-                      </div>
-                    </>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Blood Group</label>
+                      <Select
+                        value={bloodGroup}
+                        onChange={(e) => setBloodGroup(e.target.value)}
+                      >
+                        {BLOOD_GROUPS.map((bg) => (
+                          <option key={bg} value={bg}>{bg}</option>
+                        ))}
+                      </Select>
+                    </div>
                   )}
                 </div>
 
@@ -660,7 +728,8 @@ const ProfilePage = () => {
                 </div>
               </form>
             </motion.div>
-          )}
+          </div>
+        )}
 
           {activeTab === 'security' && (
             <motion.div

@@ -17,7 +17,6 @@ import ResetPassword from '../pages/ResetPassword';
 import ProfilePage from '../pages/ProfilePage';
 import VerifyAccount from '../pages/VerifyAccount';
 
-import DonorAvailabilityPage from '../pages/DonorAvailabilityPage';
 import SearchDonors from '../pages/SearchDonors';
 import Requests from '../pages/Requests';
 import DonationHistory from '../pages/DonationHistory';
@@ -76,15 +75,6 @@ const AppRoutes = () => (
               element={
                 <RoleRoute roles={['donor']}>
                   <Requests />
-                </RoleRoute>
-              }
-            />
-
-            <Route
-              path="availability"
-              element={
-                <RoleRoute roles={['donor']}>
-                  <DonorAvailabilityPage />
                 </RoleRoute>
               }
             />
