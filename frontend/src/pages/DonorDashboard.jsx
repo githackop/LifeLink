@@ -10,7 +10,6 @@ import { getErrorMessage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import StatCard from '../components/dashboard/StatCard';
 import RecentActivity from '../components/dashboard/RecentActivity';
-import AvailabilityToggle from '../components/dashboard/AvailabilityToggle';
 import { DashboardError, DashboardLoading } from '../components/dashboard/DashboardState';
 
 const DonorDashboard = () => {
@@ -66,41 +65,82 @@ const DonorDashboard = () => {
 
   return (
     <div className="space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 p-6 sm:p-8 text-white shadow-xl shadow-rose-500/25"
-      >
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full blur-2xl" />
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <p className="text-rose-100 text-sm font-medium">Donor profile</p>
-            <h1 className="text-2xl sm:text-3xl font-bold mt-1">{profile?.name}</h1>
-            <div className="flex flex-wrap gap-3 mt-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 text-sm font-semibold">
-                <Droplets className="w-4 h-4" />
-                {profile?.bloodGroup}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 text-sm">
-                <MapPin className="w-4 h-4" />
-                {profile?.city || 'City not set'}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 p-6 sm:p-8 text-white shadow-xl shadow-rose-500/25 h-full flex flex-col justify-between"
+          >
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full blur-2xl" />
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 h-full">
+              <div>
+                <p className="text-rose-100 text-sm font-medium">Donor profile</p>
+                <h1 className="text-2xl sm:text-3xl font-bold mt-1">{profile?.name}</h1>
+                <div className="flex flex-wrap gap-3 mt-3">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 text-sm font-semibold">
+                    <Droplets className="w-4 h-4" />
+                    {profile?.bloodGroup}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 text-sm">
+                    <MapPin className="w-4 h-4" />
+                    {profile?.city || 'City not set'}
+                  </span>
+                </div>
+              </div>
+              <span
+                className={`self-start sm:self-auto px-4 py-2 rounded-full text-sm font-semibold backdrop-blur
+                  ${available ? 'bg-emerald-400/30 text-white' : 'bg-slate-900/30 text-rose-100'}`}
+              >
+                {available ? '● Available' : '○ Unavailable'}
               </span>
             </div>
-          </div>
-          <span
-            className={`self-start sm:self-auto px-4 py-2 rounded-full text-sm font-semibold backdrop-blur
-              ${available ? 'bg-emerald-400/30 text-white' : 'bg-slate-900/30 text-rose-100'}`}
-          >
-            {available ? '● Available' : '○ Unavailable'}
-          </span>
+          </motion.div>
         </div>
-      </motion.div>
 
-      <AvailabilityToggle
-        available={available}
-        onChange={handleAvailabilityChange}
-        loading={toggleLoading}
-      />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="rounded-3xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft flex flex-col justify-between min-h-[160px] h-full"
+        >
+          <div>
+            <h2 className="font-semibold text-slate-800 text-lg">Donation Availability</h2>
+            <p className="text-slate-500 text-sm mt-1">
+              Current Status:{' '}
+              <span className={`font-semibold ${available ? 'text-emerald-600' : 'text-slate-500'}`}>
+                {available ? 'Available' : 'Unavailable'}
+              </span>
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-sm text-slate-600 font-semibold">Available for Donation</span>
+            <button
+              type="button"
+              disabled={toggleLoading}
+              onClick={() => handleAvailabilityChange(!available)}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60 flex-shrink-0
+                ${available ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-slate-300'}`}
+              aria-pressed={available}
+              aria-label="Toggle availability"
+            >
+              {toggleLoading ? (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <div className={`w-3.5 h-3.5 border-2 rounded-full animate-spin border-t-transparent ${available ? 'border-white' : 'border-slate-500'}`} />
+                </span>
+              ) : (
+                <motion.span
+                  layout
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  className={`absolute flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm
+                    ${available ? 'left-[calc(100%-1.375rem)]' : 'left-1'}`}
+                />
+              )}
+            </button>
+          </div>
+        </motion.div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
