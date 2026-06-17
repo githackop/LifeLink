@@ -12,11 +12,14 @@ import {
   Home,
   Heart,
   Activity,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import FormInput from '../components/ui/FormInput';
 import Button from '../components/ui/Button';
 import RoleSelector, { BLOOD_GROUPS } from '../components/auth/RoleSelector';
+import { showSuccess } from '../utils/toast';
+import Select from '../components/ui/Select';
 
 const initialForm = {
   name: '',
@@ -40,6 +43,26 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Password Complexity Checker
+  const criteria = [
+    { label: 'Minimum 8 characters', met: form.password.length >= 8 },
+    { label: 'At least one uppercase letter (A-Z)', met: /[A-Z]/.test(form.password) },
+    { label: 'At least one lowercase letter (a-z)', met: /[a-z]/.test(form.password) },
+    { label: 'At least one number (0-9)', met: /[0-9]/.test(form.password) },
+    { label: 'At least one special character (e.g. !@#$%)', met: /[^A-Za-z0-9]/.test(form.password) },
+  ];
+
+  const metCount = criteria.filter((c) => c.met).length;
+
+  const getStrength = () => {
+    if (form.password.length === 0) return { label: 'None', color: 'bg-slate-200', text: 'text-slate-400' };
+    if (metCount <= 2) return { label: 'Weak', color: 'bg-red-500 w-1/4', text: 'text-red-500' };
+    if (metCount <= 4) return { label: 'Medium', color: 'bg-amber-500 w-2/4', text: 'text-amber-500' };
+    return { label: 'Strong', color: 'bg-emerald-500 w-full', text: 'text-emerald-500' };
+  };
+
+  const strength = getStrength();
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
@@ -53,9 +76,16 @@ const Register = () => {
     const next = {};
     if (!form.name.trim()) next.name = 'Name is required';
     if (!form.email.trim()) next.email = 'Email is required';
-    if (!form.password) next.password = 'Password is required';
-    else if (form.password.length < 6) next.password = 'At least 6 characters';
-    if (form.password !== form.confirmPassword) next.confirmPassword = 'Passwords do not match';
+    
+    if (!form.password) {
+      next.password = 'Password is required';
+    } else if (metCount < 5) {
+      next.password = 'Password must meet all complexity requirements';
+    }
+    
+    if (form.password !== form.confirmPassword) {
+      next.confirmPassword = 'Passwords do not match';
+    }
     if (!form.phoneNumber.trim()) next.phoneNumber = 'Phone is required';
 
     if (form.role === 'donor') {
@@ -102,8 +132,9 @@ const Register = () => {
         });
       }
 
-      await register(payload);
-      navigate('/', { replace: true });
+      const res = await register(payload);
+      showSuccess(res.message || 'OTP verification code sent successfully!');
+      navigate(`/verify-account?email=${encodeURIComponent(form.email)}`, { replace: true });
     } catch {
       // handled in context
     } finally {
@@ -228,7 +259,7 @@ const Register = () => {
                 name="password"
                 type="password"
                 autoComplete="new-password"
-                placeholder="Min. 6 characters"
+                placeholder="Min. 8 characters"
                 icon={Lock}
                 value={form.password}
                 onChange={handleChange}
@@ -247,6 +278,33 @@ const Register = () => {
               />
             </div>
 
+            {/* Password Strength Meter */}
+            {form.password && (
+              <div className="space-y-3 p-4 rounded-2xl bg-white border border-slate-100 shadow-soft">
+                <div className="flex justify-between items-center text-xs font-semibold">
+                  <span className="text-slate-400">Password Strength:</span>
+                  <span className={strength.text}>{strength.label}</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full transition-all duration-300 rounded-full ${strength.color}`} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-50">
+                  {criteria.map((c, i) => (
+                    <div key={i} className="flex items-center gap-1.5 font-medium">
+                      {c.met ? (
+                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      ) : (
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300 ml-1.5 mr-1.5 flex-shrink-0" />
+                      )}
+                      <span className={c.met ? 'text-emerald-700' : 'text-slate-500'}>
+                        {c.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <AnimatePresence mode="wait">
               {form.role === 'donor' && (
                 <motion.div
@@ -261,18 +319,17 @@ const Register = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-slate-700">Blood group</label>
-                        <select
+                        <Select
                           name="bloodGroup"
                           value={form.bloodGroup}
                           onChange={handleChange}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500"
                         >
                           {BLOOD_GROUPS.map((bg) => (
                             <option key={bg} value={bg}>
                               {bg}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                       <FormInput
                         label="City"

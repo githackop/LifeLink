@@ -202,11 +202,11 @@ const AdminUserDetailsModal = ({ userId, open, onClose }) => {
                     </span>
                     {data.user?.role === 'hospital' && (
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${
-                        data.user?.isVerified
+                        data.user?.isHospitalVerified
                           ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                           : 'bg-amber-100 text-amber-800 border-amber-200'
                       }`}>
-                        {data.user?.isVerified ? 'Verified' : 'Pending Verification'}
+                        {data.user?.isHospitalVerified ? 'Verified' : 'Pending Verification'}
                       </span>
                     )}
                   </div>
@@ -338,9 +338,9 @@ const AdminUserDetailsModal = ({ userId, open, onClose }) => {
                         <div className="flex justify-between gap-2">
                           <span className="text-slate-400 font-medium">Verification Status</span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                            data.user?.isVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                            data.user?.isHospitalVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                           }`}>
-                            {data.user?.isVerified ? 'Verified' : 'Pending Verification'}
+                            {data.user?.isHospitalVerified ? 'Verified' : 'Pending Verification'}
                           </span>
                         </div>
                         <div className="flex justify-between gap-2">

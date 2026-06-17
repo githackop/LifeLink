@@ -18,11 +18,17 @@ const validateObjectId = (id) => {
 
 const formatAdminUser = (user) => {
   const json = user.toPublicJSON();
+  let status = 'active';
+  if (user.isBlocked) status = 'blocked';
+  else if (user.isDeactivated) status = 'deactivated';
+
   return {
     ...json,
-    status: user.isBlocked ? 'blocked' : 'active',
+    status,
     isBlocked: Boolean(user.isBlocked),
+    isDeactivated: Boolean(user.isDeactivated),
     isVerified: Boolean(user.isVerified),
+    isHospitalVerified: Boolean(user.isHospitalVerified),
   };
 };
 
@@ -320,16 +326,16 @@ export const toggleHospitalVerify = asyncHandler(async (req, res) => {
   }
 
   if (typeof req.body.verified === 'boolean') {
-    hospital.isVerified = req.body.verified;
+    hospital.isHospitalVerified = req.body.verified;
   } else {
-    hospital.isVerified = !hospital.isVerified;
+    hospital.isHospitalVerified = !hospital.isHospitalVerified;
   }
 
   await hospital.save();
 
-  notifyAdminChange(hospital.isVerified ? 'hospital_verified' : 'hospital_unverified', hospital);
+  notifyAdminChange(hospital.isHospitalVerified ? 'hospital_verified' : 'hospital_unverified', hospital);
 
-  if (hospital.isVerified) {
+  if (hospital.isHospitalVerified) {
     const title = 'Hospital Verified';
     const message = 'Your hospital account has been approved. You now have full access to hospital features.';
     
@@ -362,7 +368,7 @@ export const toggleHospitalVerify = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: hospital.isVerified
+    message: hospital.isHospitalVerified
       ? 'Hospital verified successfully'
       : 'Hospital verification removed',
     hospital: formatAdminUser(hospital),

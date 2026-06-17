@@ -1,64 +1,840 @@
-import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Building2, Droplets } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
+import {
+  User,
+  Lock,
+  Settings,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Building2,
+  Droplets,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  AlertTriangle,
+  Shield,
+  Activity,
+  ArrowRight,
+  ShieldAlert,
+  Clock,
+  Home,
+  Check,
+  Key,
+  Trash2,
+  LockKeyhole,
+  X
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { roleLabels } from '../utils/roleConfig';
+import * as profileService from '../services/profileService';
+import ConfirmModal from '../components/common/ConfirmModal';
+import Button from '../components/ui/Button';
+import Select from '../components/ui/Select';
 
+const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+// OTP Verification Modal Component
+const OtpModal = ({ isOpen, onClose, onVerified, email }) => {
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!otp || otp.length < 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
+    }
+    setLoading(true);
+    try {
+      await profileService.verifyPasswordOtp(otp);
+      toast.success('OTP verified successfully');
+      onVerified();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Invalid or expired OTP';
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await profileService.sendPasswordOtp();
+      toast.success('OTP resent successfully');
+    } catch (err) {
+      toast.error('Failed to resend OTP');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm pointer-events-auto"
+            onClick={onClose}
+          />
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            className="relative pointer-events-auto w-full max-w-md rounded-2xl border border-slate-100 bg-white shadow-2xl p-6 overflow-hidden flex flex-col gap-4"
+          >
+            <div className="flex items-start justify-between pb-2 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-rose-500" />
+                OTP Verification Required
+              </h3>
+              <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-slate-500 text-sm leading-relaxed">
+              We have sent a 6-digit verification code to your email address: <strong className="text-slate-800">{email}</strong>. Please enter it below to proceed.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Enter 6-Digit OTP</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="123456"
+                  className="w-full tracking-[8px] text-center font-extrabold text-xl py-3 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-slate-400">Didn't receive code?</span>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="text-brand-600 hover:text-brand-500 font-bold disabled:opacity-50"
+                >
+                  {resending ? 'Resending...' : 'Resend OTP'}
+                </button>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-3">
+                <Button type="button" variant="secondary" onClick={onClose} className="!py-2 text-xs">
+                  Cancel
+                </Button>
+                <Button type="submit" loading={loading} className="!py-2 text-xs text-white bg-rose-600 border-none hover:bg-rose-500">
+                  Verify OTP
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// Change Password Modal Component
+const ChangePasswordModal = ({ isOpen, onClose, onCompleted }) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState({ new: false, confirm: false });
+
+  // Password Strength Checker
+  const criteria = [
+    { label: 'Minimum 8 characters', met: newPassword.length >= 8 },
+    { label: 'At least one uppercase letter (A-Z)', met: /[A-Z]/.test(newPassword) },
+    { label: 'At least one lowercase letter (a-z)', met: /[a-z]/.test(newPassword) },
+    { label: 'At least one number (0-9)', met: /[0-9]/.test(newPassword) },
+    { label: 'At least one special character (!@#...)', met: /[^A-Za-z0-9]/.test(newPassword) },
+  ];
+  
+  const metCount = criteria.filter((c) => c.met).length;
+  
+  const getStrengthLabel = () => {
+    if (newPassword.length === 0) return { label: 'None', color: 'bg-slate-200', text: 'text-slate-400' };
+    if (metCount <= 2) return { label: 'Weak', color: 'bg-red-500 w-1/4', text: 'text-red-500' };
+    if (metCount <= 4) return { label: 'Medium', color: 'bg-amber-500 w-2/4', text: 'text-amber-500' };
+    return { label: 'Strong', color: 'bg-emerald-500 w-full', text: 'text-emerald-500' };
+  };
+
+  const strength = getStrengthLabel();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (metCount < 5) {
+      toast.error('New password does not meet all safety requirements');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await profileService.changePassword(newPassword);
+      toast.success('Password changed successfully');
+      onCompleted();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to update password.';
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm pointer-events-auto"
+            onClick={onClose}
+          />
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            className="relative pointer-events-auto w-full max-w-md rounded-2xl border border-slate-100 bg-white shadow-2xl p-6 overflow-hidden flex flex-col gap-4"
+          >
+            <div className="flex items-start justify-between pb-2 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <LockKeyhole className="w-5 h-5 text-rose-500" />
+                Change Password
+              </h3>
+              <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+
+              {/* New Password */}
+              <div className="relative">
+                <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showPass.new ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full py-2 px-3 pr-10 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    placeholder="Create secure password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(prev => ({ ...prev, new: !prev.current }))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPass.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Strength Meter Bar */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-xs font-semibold">
+                  <span className="text-slate-400">Password Strength:</span>
+                  <span className={strength.text}>{strength.label}</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full transition-all duration-300 rounded-full ${strength.color}`} />
+                </div>
+              </div>
+
+              {/* Strength Criteria List */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 grid grid-cols-1 gap-1 text-[11px]">
+                {criteria.map((c, i) => (
+                  <div key={i} className="flex items-center gap-1.5 font-medium">
+                    {c.met ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                    ) : (
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-300 ml-1 mr-1 flex-shrink-0" />
+                    )}
+                    <span className={c.met ? 'text-emerald-700' : 'text-slate-500'}>{c.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Confirm Password */}
+              <div className="relative">
+                <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Confirm New Password</label>
+                <div className="relative">
+                  <input
+                    type={showPass.confirm ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full py-2 px-3 pr-10 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    placeholder="Verify secure password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(prev => ({ ...prev, confirm: !prev.confirm }))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPass.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-3">
+                <Button type="button" variant="secondary" onClick={onClose} className="!py-2 text-xs">
+                  Cancel
+                </Button>
+                <Button type="submit" loading={loading} className="!py-2 text-xs text-white bg-rose-600 border-none hover:bg-rose-500">
+                  Update Password
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// Reusable X close icon
+const XIcon = ({ className }) => <X className={className} />;
+
+// MAIN PROFILE REDESIGN PAGE
 const ProfilePage = () => {
-  const { user } = useAuth();
+  const { user, updateUser, refreshUser, logout } = useAuth();
   const badge = roleLabels[user?.role] || roleLabels.user;
 
-  const fields = [
-    { label: 'Email', value: user?.email, icon: Mail },
-    { label: 'Phone', value: user?.phoneNumber, icon: Phone },
-  ];
+  const [activeTab, setActiveTab] = useState('personal'); // Tab states: 'personal', 'security', 'settings'
+  const [editLoading, setEditLoading] = useState(false);
 
-  if (user?.city) {
-    fields.push({ label: 'City', value: user.city, icon: MapPin });
-  }
-  if (user?.role === 'donor' && user?.bloodGroup) {
-    fields.push({ label: 'Blood group', value: user.bloodGroup, icon: Droplets });
-  }
-  if (user?.role === 'hospital' && user?.hospitalName) {
-    fields.push({ label: 'Hospital', value: user.hospitalName, icon: Building2 });
-  }
+  // Edit details form states
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
+  const [city, setCity] = useState(user?.city || '');
+  const [address, setAddress] = useState(user?.address || '');
+  const [bloodGroup, setBloodGroup] = useState(user?.bloodGroup || BLOOD_GROUPS[0]);
+  const [hospitalName, setHospitalName] = useState(user?.hospitalName || '');
+  const [availability, setAvailability] = useState(user?.availability !== false);
+
+  // Verification modal states
+  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // OTP & Password Change wizard modals
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  const isDonor = user?.role === 'donor';
+  const isHospital = user?.role === 'hospital';
+
+  // Personal Form Submission
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+
+    if (!name.trim()) return toast.error('Name is required');
+    if (!email.trim()) return toast.error('Email is required');
+    if (!phoneNumber.trim()) return toast.error('Phone number is required');
+
+    setEditLoading(true);
+    try {
+      const payload = {
+        name,
+        email,
+        phoneNumber,
+        city,
+        address,
+      };
+
+      if (isDonor) {
+        payload.bloodGroup = bloodGroup;
+        payload.availability = availability;
+      }
+      if (isHospital) {
+        payload.hospitalName = hospitalName;
+      }
+
+      const { data } = await profileService.updateProfile(payload);
+      updateUser(data.user);
+      toast.success(data.message || 'Profile updated successfully');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to update profile';
+      toast.error(msg);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Secure Password Change trigger
+  const handlePasswordChangeTrigger = async () => {
+    setOtpLoading(true);
+    try {
+      await profileService.sendPasswordOtp();
+      toast.success('Verification OTP code sent to your registered email');
+      setOtpModalOpen(true);
+    } catch (err) {
+      toast.error('Failed to dispatch OTP verification mail');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // Account Deactivate flow
+  const handleDeactivate = async () => {
+    setDeactivateLoading(true);
+    try {
+      await profileService.deactivateAccount();
+      toast.success('Your account has been deactivated successfully.');
+      setIsDeactivating(false);
+      logout();
+    } catch (err) {
+      toast.error('Failed to deactivate account');
+      setDeactivateLoading(false);
+    }
+  };
+
+  // Account Deletion flow
+  const handleDelete = async () => {
+    setDeleteLoading(true);
+    try {
+      await profileService.deleteAccount();
+      toast.success('Your account has been permanently removed.');
+      setIsDeleting(false);
+      logout();
+    } catch (err) {
+      toast.error('Failed to delete account');
+      setDeleteLoading(false);
+    }
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-2xl"
+      className="max-w-4xl space-y-6 mx-auto px-4"
     >
-      <h1 className="text-2xl font-bold text-slate-900">Profile</h1>
-      <p className="text-slate-500 mt-1 text-sm">Your account information</p>
+      {/* PAGE HEADER */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Profile</h1>
+        <p className="text-slate-500 mt-1 text-sm">Manage your profile, security details, and settings.</p>
+      </div>
 
-      <div className="mt-6 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500 to-rose-600 flex items-center justify-center text-white text-xl font-bold">
-            {user?.name?.charAt(0)?.toUpperCase()}
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">{user?.name}</h2>
-            <span className={`inline-flex mt-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${badge.color}`}>
-              {badge.label}
-            </span>
-          </div>
+      {/* SLAEK METRIC SUMMARY HEADER CONTAINER */}
+      <div className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft flex flex-col md:flex-row gap-6 items-center md:items-start">
+        {/* Avatar Placeholder */}
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-500 to-rose-600 flex items-center justify-center text-white text-3xl font-black shadow-md flex-shrink-0">
+          {user?.name?.charAt(0)?.toUpperCase() || <User className="w-8 h-8" />}
         </div>
 
-        <div className="mt-6 grid gap-3">
-          {fields.map(({ label, value, icon: Icon }) => (
-            <div
-              key={label}
-              className="flex items-center gap-3 p-4 rounded-xl bg-slate-50/80 border border-slate-100"
-            >
-              <Icon className="w-5 h-5 text-slate-400" />
-              <div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
-                <p className="text-sm font-medium text-slate-900">{value}</p>
-              </div>
+        <div className="flex-1 text-center md:text-left space-y-3">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-950 flex items-center justify-center md:justify-start gap-2 flex-wrap">
+              {user?.name}
+              {((isHospital ? user?.isHospitalVerified : user?.isVerified)) && (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-100 flex-shrink-0" />
+              )}
+            </h2>
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-1">
+              <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${badge.color}`}>
+                {badge.label}
+              </span>
+              {user?.city && (
+                <span className="inline-flex items-center gap-0.5 text-xs text-slate-500 font-medium">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                  {user.city}
+                </span>
+              )}
             </div>
-          ))}
+          </div>
+
+          <div className="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-2 pt-2 border-t border-slate-100 text-xs text-slate-500 font-medium">
+            <span className="flex items-center gap-1">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              Member Since {new Date(user?.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })}
+            </span>
+
+            {isDonor && (
+              <span className="flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-slate-400" />
+                Availability Status: 
+                <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${availability ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                  {availability ? 'Available' : 'Unavailable'}
+                </span>
+              </span>
+            )}
+
+            {isHospital && (
+              <span className="flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-slate-400" />
+                Facility Status:
+                <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${user?.isHospitalVerified ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100 animate-pulse'}`}>
+                  {user?.isHospitalVerified ? 'Approved' : 'Pending Verification'}
+                </span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* NAVIGATION TABS */}
+      <div className="flex border-b border-slate-200/80 gap-6 text-sm font-semibold">
+        <button
+          onClick={() => setActiveTab('personal')}
+          className={`flex items-center gap-2 pb-3.5 border-b-2 transition-all relative ${activeTab === 'personal' ? 'text-brand-600 border-brand-500' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+        >
+          <User className="w-4 h-4" />
+          Personal Info
+          {activeTab === 'personal' && (
+            <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('security')}
+          className={`flex items-center gap-2 pb-3.5 border-b-2 transition-all relative ${activeTab === 'security' ? 'text-brand-600 border-brand-500' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+        >
+          <Lock className="w-4 h-4" />
+          Security
+          {activeTab === 'security' && (
+            <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`flex items-center gap-2 pb-3.5 border-b-2 transition-all relative ${activeTab === 'settings' ? 'text-brand-600 border-brand-500' : 'text-slate-500 border-transparent hover:text-slate-800'}`}
+        >
+          <Settings className="w-4 h-4" />
+          Account Settings
+          {activeTab === 'settings' && (
+            <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
+          )}
+        </button>
+      </div>
+
+      {/* TAB CONTENT DETAILS */}
+      <div className="mt-4">
+        <AnimatePresence mode="wait">
+          {activeTab === 'personal' && (
+            <motion.div
+              key="personal"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft space-y-6"
+            >
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="font-bold text-slate-900 text-lg">Personal Information</h3>
+                <p className="text-slate-400 text-xs mt-0.5">Edit details associated with your public account.</p>
+              </div>
+
+              <form onSubmit={handleProfileUpdate} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Name Input */}
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Jane Doe"
+                      className="w-full py-2.5 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    />
+                  </div>
+
+                  {/* Email Input */}
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full py-2.5 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    />
+                  </div>
+
+                  {/* Phone Input */}
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="9876543210"
+                      className="w-full py-2.5 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    />
+                  </div>
+
+                  {/* City Input */}
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">City / Region</label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Hyderabad"
+                      className="w-full py-2.5 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    />
+                  </div>
+
+                  {/* Hospital Specific Fields */}
+                  {isHospital && (
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Hospital Name</label>
+                      <input
+                        type="text"
+                        value={hospitalName}
+                        onChange={(e) => setHospitalName(e.target.value)}
+                        placeholder="Apollo Emergency Services"
+                        className="w-full py-2.5 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {/* Address Input */}
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Physical Address</label>
+                    <textarea
+                      rows={2}
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Enter details..."
+                      className="w-full py-2.5 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    />
+                  </div>
+
+                  {/* Donor Specific Fields */}
+                  {isDonor && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Blood Group</label>
+                        <Select
+                          value={bloodGroup}
+                          onChange={(e) => setBloodGroup(e.target.value)}
+                        >
+                          {BLOOD_GROUPS.map((bg) => (
+                            <option key={bg} value={bg}>{bg}</option>
+                          ))}
+                        </Select>
+                      </div>
+
+                      {/* Availability Switch */}
+                      <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800">Availability Status</label>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">Let requesters know you are available.</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={availability}
+                          onChange={(e) => setAvailability(e.target.checked)}
+                          className="w-5 h-5 rounded accent-emerald-600 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-3">
+                  <Button type="submit" loading={editLoading} className="!py-2.5 !px-6 bg-brand-600 border-none text-white hover:bg-brand-500">
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+
+          {activeTab === 'security' && (
+            <motion.div
+              key="security"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft space-y-6"
+            >
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="font-bold text-slate-900 text-lg">Account Security</h3>
+                <p className="text-slate-400 text-xs mt-0.5">Update passwords and secure credentials verification.</p>
+              </div>
+
+              <div className="flex flex-col md:flex-row items-center gap-5 p-5 rounded-2xl bg-rose-50/20 border border-rose-100/50">
+                <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 flex-shrink-0">
+                  <Key className="w-6 h-6" />
+                </div>
+                <div className="flex-1 space-y-1 text-center md:text-left">
+                  <h4 className="font-bold text-slate-900 text-sm">Secure Password Verification Process</h4>
+                  <p className="text-slate-500 text-xs leading-relaxed max-w-xl">
+                    LifeLink utilizes email verification codes (OTP) to confirm password changes. When you click below, an OTP code will be sent to your inbox.
+                  </p>
+                </div>
+                <Button
+                  onClick={handlePasswordChangeTrigger}
+                  loading={otpLoading}
+                  className="w-full md:w-auto !py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 border-none text-white text-xs font-bold shadow-md shadow-rose-600/10 whitespace-nowrap"
+                >
+                  Change Password
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'settings' && (
+            <motion.div
+              key="settings"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="rounded-2xl border border-white/60 bg-white/70 backdrop-blur-xl p-6 shadow-soft space-y-6"
+            >
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="font-bold text-slate-900 text-lg">Account Settings</h3>
+                <p className="text-slate-400 text-xs mt-0.5">Overview of credentials and administrative features.</p>
+              </div>
+
+              {/* ACCOUNT INFO SUMMARY LIST */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex items-center gap-3">
+                  <Mail className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Primary Email</span>
+                    <span className="font-bold text-slate-800">{user?.email}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex items-center gap-3">
+                  <Phone className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Primary Contact</span>
+                    <span className="font-bold text-slate-800">{user?.phoneNumber}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex items-center gap-3">
+                  <Shield className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">System Role</span>
+                    <span className="font-bold text-slate-800 uppercase tracking-wide">{user?.role}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Join Date</span>
+                    <span className="font-bold text-slate-800">{new Date(user?.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* DANGEROUS SECTION */}
+              <div className="border-t border-slate-100 pt-6 space-y-4">
+                <div className="space-y-1">
+                  <h4 className="font-bold text-slate-900 text-sm">Danger Zone</h4>
+                  <p className="text-slate-400 text-xs">Settings related to restriction or removal of the account.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* DEACTIVATE OPTION */}
+                  <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50 flex flex-col justify-between gap-3">
+                    <div>
+                      <h5 className="font-bold text-slate-800 text-xs">Deactivate Account</h5>
+                      <p className="text-slate-400 text-[11px] leading-relaxed mt-1">
+                        Temporarily restrict access. Your public records and notifications will be blocked until an administrator re-activates your status.
+                      </p>
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setIsDeactivating(true)}
+                        className="text-xs font-bold text-red-600 hover:text-red-500 py-1.5 px-3 rounded-lg border border-red-200 hover:border-red-300 hover:bg-red-50/50 bg-white"
+                      >
+                        Deactivate Account
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* DELETE OPTION */}
+                  <div className="p-4 rounded-xl border border-red-200/80 bg-red-50/10 flex flex-col justify-between gap-3">
+                    <div>
+                      <h5 className="font-bold text-red-950 text-xs">Delete Account Permanently</h5>
+                      <p className="text-slate-400 text-[11px] leading-relaxed mt-1">
+                        Permanently remove your account, settings, and donor files. This action is irreversible. All data is deleted instantly.
+                      </p>
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setIsDeleting(true)}
+                        className="text-xs font-bold text-white bg-red-600 hover:bg-red-500 py-1.5 px-3 rounded-lg border border-none shadow-md shadow-red-600/10"
+                      >
+                        Delete Permanently
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* WIZARD MODALS */}
+      <OtpModal
+        isOpen={otpModalOpen}
+        email={user?.email}
+        onClose={() => setOtpModalOpen(false)}
+        onVerified={() => {
+          setOtpModalOpen(false);
+          setChangePasswordOpen(true);
+        }}
+      />
+
+      <ChangePasswordModal
+        isOpen={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+        onCompleted={() => setChangePasswordOpen(false)}
+      />
+
+      {/* CONFIRMATION DIALOGS */}
+      <ConfirmModal
+        isOpen={isDeactivating}
+        title="Deactivate Account"
+        description="Are you absolutely sure you want to deactivate your LifeLink account? You will be logged out and your profile status will be locked until re-activated by an administrator."
+        confirmText="Yes, Deactivate"
+        isDanger={true}
+        loading={deactivateLoading}
+        onConfirm={handleDeactivate}
+        onCancel={() => setIsDeactivating(false)}
+      />
+
+      <ConfirmModal
+        isOpen={isDeleting}
+        title="Permanently Delete Account"
+        description="Are you sure you want to delete your LifeLink account? This will permanently erase your profile, requests, and donor record. This operation cannot be undone."
+        confirmText="Yes, Delete Permanently"
+        isDanger={true}
+        loading={deleteLoading}
+        onConfirm={handleDelete}
+        onCancel={() => setIsDeleting(false)}
+      />
     </motion.div>
   );
 };

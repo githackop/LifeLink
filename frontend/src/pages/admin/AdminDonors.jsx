@@ -6,6 +6,7 @@ import { getAdminDonors, deleteAdminDonor } from '../../services/adminService';
 import { getErrorMessage } from '../../services/api';
 import { BLOOD_GROUPS } from '../../utils/bloodGroups';
 import Button from '../../components/ui/Button';
+import Select from '../../components/ui/Select';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import AdminUserDetailsModal from '../../components/admin/AdminUserDetailsModal';
 import ConfirmModal from '../../components/common/ConfirmModal';
@@ -85,12 +86,12 @@ const AdminDonors = () => {
           e.preventDefault();
           fetchDonors();
         }}
-        className="flex flex-col sm:flex-row gap-3"
+        className="relative z-20 flex flex-col sm:flex-row gap-3"
       >
-        <select
+        <Select
           value={bloodGroup}
           onChange={(e) => setBloodGroup(e.target.value)}
-          className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+          className="!py-2 focus:ring-rose-500/30 focus:border-rose-500"
         >
           <option value="">All blood groups</option>
           {BLOOD_GROUPS.map((bg) => (
@@ -98,7 +99,7 @@ const AdminDonors = () => {
               {bg}
             </option>
           ))}
-        </select>
+        </Select>
         <input
           type="text"
           placeholder="Filter by city..."

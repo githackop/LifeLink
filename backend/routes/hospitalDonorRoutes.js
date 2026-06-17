@@ -2,6 +2,8 @@ import express from 'express';
 import {
   getHospitalDonors,
   addManualHospitalDonor,
+  updateHospitalDonor,
+  deleteHospitalDonor,
 } from '../controllers/hospitalDonorController.js';
 
 import { protect, isVerifiedHospital } from '../middleware/authMiddleware.js';
@@ -17,6 +19,22 @@ router.post(
   isVerifiedHospital,
   authorize('hospital'),
   addManualHospitalDonor
+);
+
+router.put(
+  '/:id',
+  protect,
+  isVerifiedHospital,
+  authorize('hospital'),
+  updateHospitalDonor
+);
+
+router.delete(
+  '/:id',
+  protect,
+  isVerifiedHospital,
+  authorize('hospital'),
+  deleteHospitalDonor
 );
 
 export default router;

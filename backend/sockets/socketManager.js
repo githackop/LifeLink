@@ -422,6 +422,14 @@ export const emitAdminUpdate = async (payload) => {
         title = 'User Restored';
         message = `${user.name || 'User'}'s account was restored`;
         break;
+      case 'user_deactivated':
+        title = 'User Account Deactivated';
+        message = `${user.name || 'User'} deactivated their account`;
+        break;
+      case 'user_reactivated':
+        title = 'User Account Reactivated';
+        message = `${user.name || 'User'} reactivated their account`;
+        break;
       case 'request_created':
         if (request.requestType === 'broadcast') {
           title = 'Emergency Broadcast Request';

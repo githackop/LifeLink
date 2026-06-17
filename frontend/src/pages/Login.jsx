@@ -38,8 +38,10 @@ const Login = () => {
     try {
       await login(form, remember);
       navigate(from, { replace: true });
-    } catch {
-      // toast handled in context
+    } catch (err) {
+      if (err.response?.status === 403 && err.response?.data?.message?.toLowerCase().includes('verify')) {
+        navigate(`/verify-account?email=${encodeURIComponent(form.email)}`, { replace: true });
+      }
     } finally {
       setLoading(false);
     }

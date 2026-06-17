@@ -77,7 +77,7 @@ const ResetPassword = () => {
             label="New password"
             name="password"
             type="password"
-            placeholder="Min. 6 characters"
+            placeholder="Min. 8 characters"
             icon={Lock}
             value={form.password}
             onChange={handleChange}

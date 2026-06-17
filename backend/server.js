@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import donorRoutes from './routes/donorRoutes.js';
 import donorsRoutes from './routes/donorsRoutes.js';
@@ -12,6 +13,7 @@ import broadcastRoutes from './routes/broadcastRoutes.js';
 import hospitalDonorRoutes from './routes/hospitalDonorRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import { protect } from './middleware/authMiddleware.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import { initSocket } from './sockets/socketManager.js';
 
@@ -41,6 +43,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', protect, profileRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/donor', donorRoutes);
 app.use('/api/donors', donorsRoutes);
