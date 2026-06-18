@@ -118,6 +118,11 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
   return obj;
 };
 
+// Indexing for search, filtering, and role checks to optimize MongoDB performance
+userSchema.index({ role: 1, availability: 1, isBlocked: 1 });
+userSchema.index({ city: 1 });
+userSchema.index({ bloodGroup: 1 });
+
 const User = mongoose.model('User', userSchema);
 
 export { ROLES, BLOOD_GROUPS };

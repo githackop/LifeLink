@@ -68,8 +68,10 @@ export const sendPasswordOtp = asyncHandler(async (req, res) => {
 
   await user.save({ validateBeforeSave: false });
 
-  // Send verification email
-  await sendOtpEmail(user.email, otp);
+  // Send verification email in the background to improve response time
+  sendOtpEmail(user.email, otp).catch((error) => {
+    console.error('Password change OTP email sending failed:', error);
+  });
 
   res.status(200).json({
     success: true,

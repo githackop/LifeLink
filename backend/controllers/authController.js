@@ -82,8 +82,10 @@ export const register = asyncHandler(async (req, res) => {
 
   const user = await User.create(userPayload);
 
-  // Send verification email
-  await sendRegistrationOtpEmail(user.email, otp);
+  // Send verification email in the background to improve response time
+  sendRegistrationOtpEmail(user.email, otp).catch((error) => {
+    console.error('OTP email sending failed:', error);
+  });
 
   // Determine administrative notification action
   let action = 'user_registered';
@@ -241,7 +243,9 @@ export const sendVerificationOtp = asyncHandler(async (req, res) => {
   user.emailVerificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   await user.save({ validateBeforeSave: false });
 
-  await sendRegistrationOtpEmail(user.email, otp);
+  sendRegistrationOtpEmail(user.email, otp).catch((error) => {
+    console.error('OTP email sending failed:', error);
+  });
 
   res.status(200).json({
     success: true,
@@ -312,7 +316,9 @@ export const resendVerificationOtp = asyncHandler(async (req, res) => {
   user.emailVerificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   await user.save({ validateBeforeSave: false });
 
-  await sendRegistrationOtpEmail(user.email, otp);
+  sendRegistrationOtpEmail(user.email, otp).catch((error) => {
+    console.error('OTP email sending failed:', error);
+  });
 
   res.status(200).json({
     success: true,

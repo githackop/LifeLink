@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import { SocketProvider } from '../context/SocketContext';
@@ -6,33 +7,41 @@ import ProtectedRoute from './ProtectedRoute';
 import GuestRoute from './GuestRoute';
 import RoleRoute from './RoleRoute';
 
-import HospitalDonors from '../pages/HospitalDonors';
-
 import DashboardLayout from '../layouts/DashboardLayout';
 import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
-import ProfilePage from '../pages/ProfilePage';
-import VerifyAccount from '../pages/VerifyAccount';
 
-import SearchDonors from '../pages/SearchDonors';
-import Requests from '../pages/Requests';
-import DonationHistory from '../pages/DonationHistory';
-import EmergencyRequests from '../pages/EmergencyRequests';
-import AdminDashboard from '../pages/admin/AdminDashboard';
-import AdminUsers from '../pages/admin/AdminUsers';
-import AdminDonors from '../pages/admin/AdminDonors';
-import AdminHospitals from '../pages/admin/AdminHospitals';
-import AdminBroadcasts from '../pages/admin/AdminBroadcasts';
-import BloodRequestsFeed from '../pages/BloodRequestsFeed';
+// Lazy load heavy page components to optimize bundle size and page loading speed
+const HospitalDonors = lazy(() => import('../pages/HospitalDonors'));
+const ProfilePage = lazy(() => import('../pages/ProfilePage'));
+const VerifyAccount = lazy(() => import('../pages/VerifyAccount'));
+const SearchDonors = lazy(() => import('../pages/SearchDonors'));
+const Requests = lazy(() => import('../pages/Requests'));
+const DonationHistory = lazy(() => import('../pages/DonationHistory'));
+const EmergencyRequests = lazy(() => import('../pages/EmergencyRequests'));
+const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'));
+const AdminDonors = lazy(() => import('../pages/admin/AdminDonors'));
+const AdminHospitals = lazy(() => import('../pages/admin/AdminHospitals'));
+const AdminBroadcasts = lazy(() => import('../pages/admin/AdminBroadcasts'));
+const BloodRequestsFeed = lazy(() => import('../pages/BloodRequestsFeed'));
+
+// Spinner fallback for Suspense page lazy loading
+const PageLoader = () => (
+  <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    <div className="w-10 h-10 border-4 border-rose-600 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const AppRoutes = () => (
   <BrowserRouter>
     <AuthProvider>
       <SocketProvider>
-        <Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
           <Route
             path="/"
             element={
@@ -198,9 +207,10 @@ const AppRoutes = () => (
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </SocketProvider>
-    </AuthProvider>
-  </BrowserRouter>
+      </Suspense>
+    </SocketProvider>
+  </AuthProvider>
+</BrowserRouter>
 );
 
 export default AppRoutes;
