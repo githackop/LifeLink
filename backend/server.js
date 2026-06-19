@@ -39,7 +39,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'LifeLink API is running' });
+  res.json({ status: 'ok' });
 });
 
 app.use('/api/auth', authRoutes);

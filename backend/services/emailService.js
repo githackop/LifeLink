@@ -1,11 +1,17 @@
 import nodemailer from 'nodemailer';
 
+let transporterInstance = null;
+
 const createTransporter = () => {
+  if (transporterInstance) {
+    return transporterInstance;
+  }
+
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER) {
     return null;
   }
 
-  return nodemailer.createTransport({
+  transporterInstance = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port: Number(process.env.EMAIL_PORT) || 587,
     secure: process.env.EMAIL_SECURE === 'true',
@@ -13,7 +19,12 @@ const createTransporter = () => {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    pool: true,             // Enable connection pooling
+    maxConnections: 5,     // Limit concurrent SMTP sockets
+    maxMessages: 100,       // Recycle socket after 100 messages
   });
+
+  return transporterInstance;
 };
 
 export const sendPasswordResetEmail = async (email, resetUrl) => {
