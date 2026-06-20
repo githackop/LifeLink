@@ -99,19 +99,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const handleVerifyEmailOtp = useCallback(async (email, otp) => {
-    try {
-      const { data } = await authService.verifyEmailOtp(email, otp);
-      setToken(data.token);
-      setUser(data.user);
-      toast.success('Email verified successfully! Welcome.');
-      return data.user;
-    } catch (error) {
-      toast.error(getErrorMessage(error));
-      throw error;
-    }
-  }, []);
-
   const value = useMemo(
     () => ({
       user,
@@ -122,11 +109,10 @@ export const AuthProvider = ({ children }) => {
       logout,
       forgotPassword: handleForgotPassword,
       resetPassword: handleResetPassword,
-      verifyEmailOtp: handleVerifyEmailOtp,
       refreshUser: loadUser,
       updateUser,
     }),
-    [user, loading, handleRegister, handleLogin, logout, handleForgotPassword, handleResetPassword, handleVerifyEmailOtp, loadUser, updateUser]
+    [user, loading, handleRegister, handleLogin, logout, handleForgotPassword, handleResetPassword, loadUser, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

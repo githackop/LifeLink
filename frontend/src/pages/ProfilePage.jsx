@@ -38,116 +38,6 @@ import Select from '../components/ui/Select';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-// OTP Verification Modal Component
-const OtpModal = ({ isOpen, onClose, onVerified, email }) => {
-  const [otp, setOtp] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!otp || otp.length < 6) {
-      toast.error('Please enter a valid 6-digit OTP');
-      return;
-    }
-    setLoading(true);
-    try {
-      await profileService.verifyPasswordOtp(otp);
-      toast.success('OTP verified successfully');
-      onVerified();
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid or expired OTP';
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResend = async () => {
-    setResending(true);
-    try {
-      await profileService.sendPasswordOtp();
-      toast.success('OTP resent successfully');
-    } catch (err) {
-      toast.error('Failed to resend OTP');
-    } finally {
-      setResending(false);
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm pointer-events-auto"
-            onClick={onClose}
-          />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            className="relative pointer-events-auto w-full max-w-md rounded-2xl border border-slate-100 bg-white shadow-2xl p-6 overflow-hidden flex flex-col gap-4"
-          >
-            <div className="flex items-start justify-between pb-2 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-rose-500" />
-                OTP Verification Required
-              </h3>
-              <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-                <XIcon className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-slate-500 text-sm leading-relaxed">
-              We have sent a 6-digit verification code to your email address: <strong className="text-slate-800">{email}</strong>. Please enter it below to proceed.
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Enter 6-Digit OTP</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="123456"
-                  className="w-full tracking-[8px] text-center font-extrabold text-xl py-3 px-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800"
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-slate-400">Didn't receive code?</span>
-                <button
-                  type="button"
-                  onClick={handleResend}
-                  disabled={resending}
-                  className="text-brand-600 hover:text-brand-500 font-bold disabled:opacity-50"
-                >
-                  {resending ? 'Resending...' : 'Resend OTP'}
-                </button>
-              </div>
-
-              <div className="flex gap-2 justify-end pt-3">
-                <Button type="button" variant="secondary" onClick={onClose} className="!py-2 text-xs">
-                  Cancel
-                </Button>
-                <Button type="submit" loading={loading} className="!py-2 text-xs text-white bg-rose-600 border-none hover:bg-rose-500">
-                  Verify OTP
-                </Button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
-};
-
 // Change Password Modal Component
 const ChangePasswordModal = ({ isOpen, onClose, onCompleted }) => {
   const [newPassword, setNewPassword] = useState('');
@@ -179,19 +69,19 @@ const ChangePasswordModal = ({ isOpen, onClose, onCompleted }) => {
     e.preventDefault();
 
     if (metCount < 5) {
-      toast.error('New password does not meet all safety requirements');
+      toast.error('Password does not meet security requirements.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error('Passwords do not match.');
       return;
     }
 
     setLoading(true);
     try {
       await profileService.changePassword(newPassword);
-      toast.success('Password changed successfully');
+      toast.success('Password updated successfully.');
       onCompleted();
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to update password.';
@@ -239,12 +129,12 @@ const ChangePasswordModal = ({ isOpen, onClose, onCompleted }) => {
                     type={showPass.new ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full py-2 px-3 pr-10 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    className="w-full py-2.5 px-4 pr-10 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
                     placeholder="Create secure password"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPass(prev => ({ ...prev, new: !prev.current }))}
+                    onClick={() => setShowPass(prev => ({ ...prev, new: !prev.new }))}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   >
                     {showPass.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -285,7 +175,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onCompleted }) => {
                     type={showPass.confirm ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full py-2 px-3 pr-10 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
+                    className="w-full py-2.5 px-4 pr-10 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-800 text-sm"
                     placeholder="Verify secure password"
                   />
                   <button
@@ -357,10 +247,8 @@ const ProfilePage = () => {
   const [deactivateLoading, setDeactivateLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // OTP & Password Change wizard modals
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  // Password Change modal
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
 
   const isDonor = user?.role === 'donor';
   const isHospital = user?.role === 'hospital';
@@ -401,19 +289,7 @@ const ProfilePage = () => {
     }
   };
 
-  // Secure Password Change trigger
-  const handlePasswordChangeTrigger = async () => {
-    setOtpLoading(true);
-    try {
-      await profileService.sendPasswordOtp();
-      toast.success('Verification OTP code sent to your registered email');
-      setOtpModalOpen(true);
-    } catch (err) {
-      toast.error('Failed to dispatch OTP verification mail');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
+
 
   // Account Deactivate flow
   const handleDeactivate = async () => {
@@ -749,14 +625,13 @@ const ProfilePage = () => {
                   <Key className="w-6 h-6" />
                 </div>
                 <div className="flex-1 space-y-1 text-center md:text-left">
-                  <h4 className="font-bold text-slate-900 text-sm">Secure Password Verification Process</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">Change Password</h4>
                   <p className="text-slate-500 text-xs leading-relaxed max-w-xl">
-                    LifeLink utilizes email verification codes (OTP) to confirm password changes. When you click below, an OTP code will be sent to your inbox.
+                    Update your account password. Ensure it meets the security requirements.
                   </p>
                 </div>
                 <Button
-                  onClick={handlePasswordChangeTrigger}
-                  loading={otpLoading}
+                  onClick={() => setChangePasswordOpen(true)}
                   className="w-full md:w-auto !py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 border-none text-white text-xs font-bold shadow-md shadow-rose-600/10 whitespace-nowrap"
                 >
                   Change Password
@@ -866,16 +741,6 @@ const ProfilePage = () => {
       </div>
 
       {/* WIZARD MODALS */}
-      <OtpModal
-        isOpen={otpModalOpen}
-        email={user?.email}
-        onClose={() => setOtpModalOpen(false)}
-        onVerified={() => {
-          setOtpModalOpen(false);
-          setChangePasswordOpen(true);
-        }}
-      />
-
       <ChangePasswordModal
         isOpen={changePasswordOpen}
         onClose={() => setChangePasswordOpen(false)}

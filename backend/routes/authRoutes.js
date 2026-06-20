@@ -5,9 +5,6 @@ import {
   getMe,
   forgotPassword,
   resetPassword,
-  sendVerificationOtp,
-  verifyEmailOtp,
-  resendVerificationOtp,
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
@@ -24,9 +21,5 @@ router.post('/login', validateLogin, login);
 router.get('/me', protect, getMe);
 router.post('/forgot-password', validateForgotPassword, forgotPassword);
 router.put('/reset-password/:resetToken', validateResetPassword, resetPassword);
-
-router.post('/send-verification-otp', sendVerificationOtp);
-router.post('/verify-email-otp', verifyEmailOtp);
-router.post('/resend-verification-otp', resendVerificationOtp);
 
 export default router;

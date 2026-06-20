@@ -17,7 +17,7 @@ import ResetPassword from '../pages/ResetPassword';
 // Lazy load heavy page components to optimize bundle size and page loading speed
 const HospitalDonors = lazy(() => import('../pages/HospitalDonors'));
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
-const VerifyAccount = lazy(() => import('../pages/VerifyAccount'));
+
 const SearchDonors = lazy(() => import('../pages/SearchDonors'));
 const Requests = lazy(() => import('../pages/Requests'));
 const DonationHistory = lazy(() => import('../pages/DonationHistory'));
@@ -182,14 +182,7 @@ const AppRoutes = () => (
             }
           />
 
-          <Route
-            path="/verify-account"
-            element={
-              <GuestRoute>
-                <VerifyAccount />
-              </GuestRoute>
-            }
-          />
+
 
           <Route
             path="/forgot-password"

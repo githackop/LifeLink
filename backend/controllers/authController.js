@@ -3,7 +3,7 @@ import User from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
 import { sendTokenResponse } from '../utils/generateToken.js';
-import { sendPasswordResetEmail, sendRegistrationOtpEmail } from '../services/emailService.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 import { emitAdminUpdate } from '../sockets/socketManager.js';
 
 const buildUserPayload = (body) => {
@@ -72,20 +72,10 @@ export const register = asyncHandler(async (req, res) => {
   }
 
   const userPayload = buildUserPayload(req.body);
-  userPayload.isVerified = false;
+  userPayload.isVerified = true;
   userPayload.isHospitalVerified = false;
 
-  // Generate OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  userPayload.emailVerificationOTP = otp;
-  userPayload.emailVerificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
   const user = await User.create(userPayload);
-
-  // Send verification email in the background to improve response time
-  sendRegistrationOtpEmail(user.email, otp).catch((error) => {
-    console.error('OTP email sending failed:', error);
-  });
 
   // Determine administrative notification action
   let action = 'user_registered';
@@ -111,11 +101,7 @@ export const register = asyncHandler(async (req, res) => {
     createdAt: user.createdAt || new Date().toISOString(),
   });
 
-  res.status(201).json({
-    success: true,
-    message: 'Registration successful! Verification OTP code sent to your registered email.',
-    email: user.email,
-  });
+  sendTokenResponse(user, 201, res);
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -137,10 +123,6 @@ export const login = asyncHandler(async (req, res) => {
 
   if (user.isBlocked) {
     throw new AppError('Your account has been temporarily blocked. Contact support.', 403);
-  }
-
-  if (!user.isVerified) {
-    throw new AppError('Please verify your email before logging in.', 403);
   }
 
   if (user.role === 'hospital' && !user.isHospitalVerified) {
@@ -222,107 +204,5 @@ export const resetPassword = asyncHandler(async (req, res) => {
   sendTokenResponse(user, 200, res);
 });
 
-// POST /api/auth/send-verification-otp
-export const sendVerificationOtp = asyncHandler(async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    throw new AppError('Please provide an email address', 400);
-  }
 
-  const user = await User.findOne({ email: email.toLowerCase() });
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  if (user.isVerified) {
-    throw new AppError('This account is already verified', 400);
-  }
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  user.emailVerificationOTP = otp;
-  user.emailVerificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-  await user.save({ validateBeforeSave: false });
-
-  sendRegistrationOtpEmail(user.email, otp).catch((error) => {
-    console.error('OTP email sending failed:', error);
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Verification OTP sent successfully to your registered email',
-  });
-});
-
-// POST /api/auth/verify-email-otp
-export const verifyEmailOtp = asyncHandler(async (req, res) => {
-  const { email, otp } = req.body;
-  if (!email || !otp) {
-    throw new AppError('Please provide both email and OTP', 400);
-  }
-
-  const user = await User.findOne({ email: email.toLowerCase() });
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  if (user.isVerified) {
-    throw new AppError('This account is already verified', 400);
-  }
-
-  if (
-    !user.emailVerificationOTP ||
-    user.emailVerificationOTP !== otp ||
-    new Date() > new Date(user.emailVerificationOTPExpires)
-  ) {
-    throw new AppError('Invalid or expired OTP', 400);
-  }
-
-  // Clear OTP fields upon verification success
-  user.isVerified = true;
-  user.emailVerificationOTP = undefined;
-  user.emailVerificationOTPExpires = undefined;
-  await user.save({ validateBeforeSave: false });
-
-  // Generate JWT response to log user in automatically upon validation
-  sendTokenResponse(user, 200, res);
-});
-
-// POST /api/auth/resend-verification-otp
-export const resendVerificationOtp = asyncHandler(async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    throw new AppError('Please provide an email address', 400);
-  }
-
-  const user = await User.findOne({ email: email.toLowerCase() });
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  if (user.isVerified) {
-    throw new AppError('This account is already verified', 400);
-  }
-
-  // Enforce 60-second cooldown rate limit
-  if (user.emailVerificationOTPExpires) {
-    const elapsedMs = 10 * 60 * 1000 - (new Date(user.emailVerificationOTPExpires) - Date.now());
-    if (elapsedMs < 60 * 1000) {
-      throw new AppError('Please wait 60 seconds before requesting a new OTP', 429);
-    }
-  }
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  user.emailVerificationOTP = otp;
-  user.emailVerificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-  await user.save({ validateBeforeSave: false });
-
-  sendRegistrationOtpEmail(user.email, otp).catch((error) => {
-    console.error('OTP email sending failed:', error);
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Verification OTP code resent successfully to your registered email',
-  });
-});
 
