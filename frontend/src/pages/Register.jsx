@@ -132,9 +132,8 @@ const Register = () => {
         });
       }
 
-      const res = await register(payload);
-      showSuccess(res.message || 'OTP verification code sent successfully!');
-      navigate(`/verify-account?email=${encodeURIComponent(form.email)}`, { replace: true });
+      await register(payload);
+      navigate('/', { replace: true });
     } catch {
       // handled in context
     } finally {

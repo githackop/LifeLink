@@ -1,7 +1,6 @@
 import User from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
-import { sendOtpEmail } from '../services/emailService.js';
 import { emitAdminUpdate } from '../sockets/socketManager.js';
 
 // PUT /api/profile
@@ -54,77 +53,20 @@ export const updateProfile = asyncHandler(async (req, res) => {
   });
 });
 
-// POST /api/profile/send-password-otp
-export const sendPasswordOtp = asyncHandler(async (req, res) => {
-  const user = req.user;
-
-  // Generate 6-digit numeric OTP code
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-  // Set expiration in 10 minutes
-  user.passwordChangeOtp = otp;
-  user.passwordChangeOtpExpire = new Date(Date.now() + 10 * 60 * 1000);
-  user.passwordChangeOtpVerified = false;
-
-  await user.save({ validateBeforeSave: false });
-
-  // Send verification email in the background to improve response time
-  sendOtpEmail(user.email, otp).catch((error) => {
-    console.error('Password change OTP email sending failed:', error);
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'OTP sent successfully to your registered email',
-  });
-});
-
-// POST /api/profile/verify-password-otp
-export const verifyPasswordOtp = asyncHandler(async (req, res) => {
-  const { otp } = req.body;
-  const user = req.user;
-
-  if (!otp) {
-    throw new AppError('Please provide the verification OTP', 400);
-  }
-
-  if (
-    !user.passwordChangeOtp ||
-    user.passwordChangeOtp !== otp ||
-    new Date() > new Date(user.passwordChangeOtpExpire)
-  ) {
-    throw new AppError('Invalid or expired OTP', 400);
-  }
-
-  user.passwordChangeOtpVerified = true;
-  await user.save({ validateBeforeSave: false });
-
-  res.status(200).json({
-    success: true,
-    message: 'OTP verified successfully. You can now change your password.',
-  });
-});
-
 // PATCH /api/profile/change-password
 export const changePassword = asyncHandler(async (req, res) => {
   const { newPassword } = req.body;
   const user = req.user;
 
-  // 1. Check if OTP is verified
-  if (!user.passwordChangeOtpVerified) {
-    throw new AppError('Verification required. Please verify the OTP first.', 400);
-  }
-
-  // 2. Validate fields
+  // 1. Validate fields
   if (!newPassword) {
     throw new AppError('Please provide the new password', 400);
   }
 
-  // 3. Fetch user record with password support
+  // 2. Fetch user record with password support
   const userWithPassword = await User.findById(user._id).select('+password');
 
-
-  // 4. Validate password complexity rules
+  // 3. Validate password complexity rules
   const minLength = newPassword.length >= 8;
   const hasUppercase = /[A-Z]/.test(newPassword);
   const hasLowercase = /[a-z]/.test(newPassword);
@@ -132,10 +74,10 @@ export const changePassword = asyncHandler(async (req, res) => {
   const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
 
   if (!minLength || !hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
-    throw new AppError('Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.', 400);
+    throw new AppError('Password does not meet security requirements.', 400);
   }
 
-  // 5. Update password and clear OTP states
+  // 4. Update password and clear OTP states
   userWithPassword.password = newPassword;
   userWithPassword.passwordChangeOtp = undefined;
   userWithPassword.passwordChangeOtpExpire = undefined;
@@ -145,7 +87,7 @@ export const changePassword = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: 'Password changed successfully',
+    message: 'Password updated successfully.',
   });
 });
 
